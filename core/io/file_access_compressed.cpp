@@ -45,8 +45,12 @@ void FileAccessCompressed::configure(const String &p_magic, Compression::Mode p_
 		if (write_pos + (m_bytes) > write_max) {            \
 			write_max = write_pos + (m_bytes);              \
 		}                                                   \
-		if (write_max > write_buffer_size) {                \
+		bool write_buffer_resized = false;                  \
+		while (write_max > write_buffer_size) {             \
 			write_buffer_size = next_power_of_2(write_max); \
+			write_buffer_resized = true;                    \
+		}                                                   \
+		if (write_buffer_resized) {                         \
 			buffer.resize(write_buffer_size);               \
 			write_ptr = buffer.ptrw();                      \
 		}                                                   \
@@ -292,6 +296,39 @@ uint8_t FileAccessCompressed::get_8() const {
 	return ret;
 }
 
+uint16_t FileAccessCompressed::get_16() const {
+	uint16_t bytes = 0;
+	get_buffer(reinterpret_cast<uint8_t *>(&bytes), 2);
+
+	if (big_endian) {
+		bytes = BSWAP16(bytes);
+	}
+
+	return bytes;
+}
+
+uint32_t FileAccessCompressed::get_32() const {
+	uint32_t bytes = 0;
+	get_buffer(reinterpret_cast<uint8_t *>(&bytes), 4);
+
+	if (big_endian) {
+		bytes = BSWAP32(bytes);
+	}
+
+	return bytes;
+}
+
+uint64_t FileAccessCompressed::get_64() const {
+	uint64_t bytes = 0;
+	get_buffer(reinterpret_cast<uint8_t *>(&bytes), 8);
+
+	if (big_endian) {
+		bytes = BSWAP64(bytes);
+	}
+
+	return bytes;
+}
+
 uint64_t FileAccessCompressed::get_buffer(uint8_t *p_dst, uint64_t p_length) const {
 	ERR_FAIL_COND_V(!p_dst && p_length > 0, -1);
 	ERR_FAIL_COND_V_MSG(f.is_null(), -1, "File must be opened before use.");
@@ -302,14 +339,14 @@ uint64_t FileAccessCompressed::get_buffer(uint8_t *p_dst, uint64_t p_length) con
 		return 0;
 	}
 
-	for (uint64_t i = 0; i < p_length; i++) {
-		p_dst[i] = read_ptr[read_pos];
-		read_pos++;
+	uint64_t buffer_total_read = 0;
+	while (buffer_total_read < p_length) {
 		if (read_pos >= read_block_size) {
+			// End of block reached, read another.
 			read_block++;
 
 			if (read_block < read_block_count) {
-				//read another block of compressed data
+				// Read another block of compressed data.
 				f->get_buffer(comp_buffer.ptrw(), read_blocks[read_block].csize);
 				int ret = Compression::decompress(buffer.ptrw(), read_blocks.size() == 1 ? read_total : block_size, comp_buffer.ptr(), read_blocks[read_block].csize, cmode);
 				ERR_FAIL_COND_V_MSG(ret == -1, -1, "Compressed file is corrupt.");
@@ -317,14 +354,21 @@ uint64_t FileAccessCompressed::get_buffer(uint8_t *p_dst, uint64_t p_length) con
 				read_pos = 0;
 
 			} else {
+				// Reached the end of the data, return.
 				read_block--;
 				at_end = true;
-				if (i + 1 < p_length) {
+				if (buffer_total_read + 1 < p_length) {
 					read_eof = true;
 				}
-				return i + 1;
+				return buffer_total_read + 1;
 			}
 		}
+
+		uint64_t read = MIN(p_length - buffer_total_read, read_block_size - read_pos);
+
+		memcpy(p_dst + buffer_total_read, read_ptr + read_pos, read);
+		buffer_total_read += read;
+		read_pos += read;
 	}
 
 	return p_length;
@@ -347,6 +391,40 @@ void FileAccessCompressed::store_8(uint8_t p_dest) {
 
 	WRITE_FIT(1);
 	write_ptr[write_pos++] = p_dest;
+}
+
+void FileAccessCompressed::store_16(uint16_t p_dest) {
+	if (big_endian) {
+		p_dest = BSWAP16(p_dest);
+	}
+
+	store_buffer(reinterpret_cast<uint8_t *>(&p_dest), 2);
+}
+
+void FileAccessCompressed::store_32(uint32_t p_dest) {
+	if (big_endian) {
+		p_dest = BSWAP32(p_dest);
+	}
+
+	store_buffer(reinterpret_cast<uint8_t *>(&p_dest), 4);
+}
+
+void FileAccessCompressed::store_64(uint64_t p_dest) {
+	if (big_endian) {
+		p_dest = BSWAP64(p_dest);
+	}
+
+	store_buffer(reinterpret_cast<uint8_t *>(&p_dest), 8);
+}
+
+void FileAccessCompressed::store_buffer(const uint8_t *p_src, uint64_t p_length) {
+	ERR_FAIL_COND_MSG(f.is_null(), "File must be opened before use.");
+	ERR_FAIL_COND_MSG(!writing, "File has not been opened in write mode.");
+
+	WRITE_FIT(p_length);
+
+	memcpy(write_ptr + write_pos, p_src, p_length);
+	write_pos += p_length;
 }
 
 bool FileAccessCompressed::file_exists(const String &p_name) {

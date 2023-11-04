@@ -169,6 +169,9 @@ public:
 	virtual bool eof_reached() const override;
 
 	virtual uint8_t get_8() const override;
+	virtual uint16_t get_16() const override;
+	virtual uint32_t get_32() const override;
+	virtual uint64_t get_64() const override;
 
 	virtual uint64_t get_buffer(uint8_t *p_dst, uint64_t p_length) const override;
 
@@ -178,6 +181,9 @@ public:
 
 	virtual void flush() override;
 	virtual void store_8(uint8_t p_dest) override;
+	virtual void store_16(uint16_t p_dest) override;
+	virtual void store_32(uint32_t p_dest) override;
+	virtual void store_64(uint64_t p_dest) override;
 
 	virtual void store_buffer(const uint8_t *p_src, uint64_t p_length) override;
 

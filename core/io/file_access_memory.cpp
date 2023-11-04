@@ -132,6 +132,39 @@ uint8_t FileAccessMemory::get_8() const {
 	return ret;
 }
 
+uint16_t FileAccessMemory::get_16() const {
+	uint16_t ret = 0;
+	get_buffer(reinterpret_cast<uint8_t *>(&ret), 2);
+
+	if (big_endian) {
+		ret = BSWAP16(ret);
+	}
+
+	return ret;
+}
+
+uint32_t FileAccessMemory::get_32() const {
+	uint32_t ret = 0;
+	get_buffer(reinterpret_cast<uint8_t *>(&ret), 4);
+
+	if (big_endian) {
+		ret = BSWAP32(ret);
+	}
+
+	return ret;
+}
+
+uint64_t FileAccessMemory::get_64() const {
+	uint64_t ret = 0;
+	get_buffer(reinterpret_cast<uint8_t *>(&ret), 8);
+
+	if (big_endian) {
+		ret = BSWAP64(ret);
+	}
+
+	return ret;
+}
+
 uint64_t FileAccessMemory::get_buffer(uint8_t *p_dst, uint64_t p_length) const {
 	ERR_FAIL_COND_V(!p_dst && p_length > 0, -1);
 	ERR_FAIL_NULL_V(data, -1);
@@ -161,6 +194,39 @@ void FileAccessMemory::store_8(uint8_t p_byte) {
 	ERR_FAIL_NULL(data);
 	ERR_FAIL_COND(pos >= length);
 	data[pos++] = p_byte;
+}
+
+void FileAccessMemory::store_16(uint16_t p_bytes) {
+	ERR_FAIL_NULL(data);
+	ERR_FAIL_COND(pos >= length);
+
+	if (big_endian) {
+		p_bytes = BSWAP16(p_bytes);
+	}
+
+	store_buffer(reinterpret_cast<uint8_t *>(&p_bytes), 2);
+}
+
+void FileAccessMemory::store_32(uint32_t p_bytes) {
+	ERR_FAIL_NULL(data);
+	ERR_FAIL_COND(pos + 3 >= length);
+
+	if (big_endian) {
+		p_bytes = BSWAP32(p_bytes);
+	}
+
+	store_buffer(reinterpret_cast<uint8_t *>(&p_bytes), 4);
+}
+
+void FileAccessMemory::store_64(uint64_t p_bytes) {
+	ERR_FAIL_NULL(data);
+	ERR_FAIL_COND(pos >= length);
+
+	if (big_endian) {
+		p_bytes = BSWAP64(p_bytes);
+	}
+
+	store_buffer(reinterpret_cast<uint8_t *>(&p_bytes), 8);
 }
 
 void FileAccessMemory::store_buffer(const uint8_t *p_src, uint64_t p_length) {

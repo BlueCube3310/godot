@@ -313,6 +313,39 @@ uint8_t FileAccessPack::get_8() const {
 	return f->get_8();
 }
 
+uint16_t FileAccessPack::get_16() const {
+	uint16_t bytes = 0;
+	get_buffer(reinterpret_cast<uint8_t *>(&bytes), 2);
+
+	if (big_endian) {
+		bytes = BSWAP16(bytes);
+	}
+
+	return bytes;
+}
+
+uint32_t FileAccessPack::get_32() const {
+	uint32_t bytes = 0;
+	get_buffer(reinterpret_cast<uint8_t *>(&bytes), 4);
+
+	if (big_endian) {
+		bytes = BSWAP32(bytes);
+	}
+
+	return bytes;
+}
+
+uint64_t FileAccessPack::get_64() const {
+	uint64_t bytes = 0;
+	get_buffer(reinterpret_cast<uint8_t *>(&bytes), 8);
+
+	if (big_endian) {
+		bytes = BSWAP64(bytes);
+	}
+
+	return bytes;
+}
+
 uint64_t FileAccessPack::get_buffer(uint8_t *p_dst, uint64_t p_length) const {
 	ERR_FAIL_COND_V_MSG(f.is_null(), -1, "File must be opened before use.");
 	ERR_FAIL_COND_V(!p_dst && p_length > 0, -1);
@@ -356,6 +389,18 @@ void FileAccessPack::flush() {
 }
 
 void FileAccessPack::store_8(uint8_t p_dest) {
+	ERR_FAIL();
+}
+
+void FileAccessPack::store_16(uint16_t p_dest) {
+	ERR_FAIL();
+}
+
+void FileAccessPack::store_32(uint32_t p_dest) {
+	ERR_FAIL();
+}
+
+void FileAccessPack::store_64(uint64_t p_dest) {
 	ERR_FAIL();
 }
 

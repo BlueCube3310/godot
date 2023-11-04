@@ -297,6 +297,39 @@ uint8_t FileAccessZip::get_8() const {
 	return ret;
 }
 
+uint16_t FileAccessZip::get_16() const {
+	uint16_t ret = 0;
+	get_buffer(reinterpret_cast<uint8_t *>(&ret), 2);
+
+	if (big_endian) {
+		ret = BSWAP16(ret);
+	}
+
+	return ret;
+}
+
+uint32_t FileAccessZip::get_32() const {
+	uint32_t ret = 0;
+	get_buffer(reinterpret_cast<uint8_t *>(&ret), 4);
+
+	if (big_endian) {
+		ret = BSWAP32(ret);
+	}
+
+	return ret;
+}
+
+uint64_t FileAccessZip::get_64() const {
+	uint64_t ret = 0;
+	get_buffer(reinterpret_cast<uint8_t *>(&ret), 8);
+
+	if (big_endian) {
+		ret = BSWAP64(ret);
+	}
+
+	return ret;
+}
+
 uint64_t FileAccessZip::get_buffer(uint8_t *p_dst, uint64_t p_length) const {
 	ERR_FAIL_COND_V(!p_dst && p_length > 0, -1);
 	ERR_FAIL_NULL_V(zfile, -1);
@@ -329,6 +362,22 @@ void FileAccessZip::flush() {
 }
 
 void FileAccessZip::store_8(uint8_t p_dest) {
+	ERR_FAIL();
+}
+
+void FileAccessZip::store_16(uint16_t p_dest) {
+	ERR_FAIL();
+}
+
+void FileAccessZip::store_32(uint32_t p_dest) {
+	ERR_FAIL();
+}
+
+void FileAccessZip::store_64(uint64_t p_dest) {
+	ERR_FAIL();
+}
+
+void FileAccessZip::store_buffer(const uint8_t *p_src, uint64_t p_length) {
 	ERR_FAIL();
 }
 
