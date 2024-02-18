@@ -78,14 +78,12 @@ Vector<uint8_t> basis_universal_packer(const Ref<Image> &p_image, Image::UsedCha
 			decompress_format = BASIS_DECOMPRESS_RGBA;
 		} break;
 		case Image::USED_CHANNELS_R: {
-			decompress_format = BASIS_DECOMPRESS_RGB;
+			decompress_format = BASIS_DECOMPRESS_R;
 		} break;
 		case Image::USED_CHANNELS_RG: {
-			// Currently RG textures are compressed as DXT5/ETC2_RGBA8 with a RA -> RG swizzle,
-			// as BasisUniversal didn't use to support ETC2_RG11 transcoding.
 			params.m_force_alpha = true;
 			image->convert_rg_to_ra_rgba8();
-			decompress_format = BASIS_DECOMPRESS_RG_AS_RA;
+			decompress_format = BASIS_DECOMPRESS_RG;
 		} break;
 		case Image::USED_CHANNELS_RGB: {
 			decompress_format = BASIS_DECOMPRESS_RGB;
@@ -155,13 +153,46 @@ Ref<Image> basis_universal_unpacker_ptr(const uint8_t *p_data, int p_size) {
 	// Get supported compression formats.
 	bool bptc_supported = RS::get_singleton()->has_os_feature("bptc");
 	bool astc_supported = RS::get_singleton()->has_os_feature("astc");
+	bool rgtc_supported = RS::get_singleton()->has_os_feature("rgtc");
 	bool s3tc_supported = RS::get_singleton()->has_os_feature("s3tc");
 	bool etc2_supported = RS::get_singleton()->has_os_feature("etc2");
 
+	bool needs_ra_rg_swap = false;
+
 	switch (*(uint32_t *)(src_ptr)) {
-		case BASIS_DECOMPRESS_RG: {
-			// RGTC transcoding is currently performed with RG_AS_RA, fail.
-			ERR_FAIL_V(image);
+		case BASIS_DECOMPRESS_R: {
+			if (rgtc_supported) {
+				basisu_format = basist::transcoder_texture_format::cTFBC4_R;
+				image_format = Image::FORMAT_RGTC_R;
+			} else if (s3tc_supported) {
+				basisu_format = basist::transcoder_texture_format::cTFBC1;
+				image_format = Image::FORMAT_DXT1;
+			} else if (etc2_supported) {
+				basisu_format = basist::transcoder_texture_format::cTFETC2_EAC_R11;
+				image_format = Image::FORMAT_ETC2_R11;
+			} else {
+				// No supported VRAM compression formats, decompress.
+				basisu_format = basist::transcoder_texture_format::cTFRGBA32;
+				image_format = Image::FORMAT_RGBA8;
+			}
+		} break;
+		case BASIS_DECOMPRESS_RG:
+		case BASIS_DECOMPRESS_RG_AS_RA: {
+			if (rgtc_supported) {
+				basisu_format = basist::transcoder_texture_format::cTFBC5_RG;
+				image_format = Image::FORMAT_RGTC_RG;
+			} else if (s3tc_supported) {
+				basisu_format = basist::transcoder_texture_format::cTFBC3;
+				image_format = Image::FORMAT_DXT5_RA_AS_RG;
+			} else if (etc2_supported) {
+				basisu_format = basist::transcoder_texture_format::cTFETC2_EAC_RG11;
+				image_format = Image::FORMAT_ETC2_RG11;
+			} else {
+				// No supported VRAM compression formats, decompress.
+				basisu_format = basist::transcoder_texture_format::cTFRGBA32;
+				image_format = Image::FORMAT_RGBA8;
+				needs_ra_rg_swap = true;
+			}
 		} break;
 		case BASIS_DECOMPRESS_RGB: {
 			if (bptc_supported) {
@@ -202,19 +233,6 @@ Ref<Image> basis_universal_unpacker_ptr(const uint8_t *p_data, int p_size) {
 				image_format = Image::FORMAT_RGBA8;
 			}
 		} break;
-		case BASIS_DECOMPRESS_RG_AS_RA: {
-			if (s3tc_supported) {
-				basisu_format = basist::transcoder_texture_format::cTFBC3;
-				image_format = Image::FORMAT_DXT5_RA_AS_RG;
-			} else if (etc2_supported) {
-				basisu_format = basist::transcoder_texture_format::cTFETC2;
-				image_format = Image::FORMAT_ETC2_RA_AS_RG;
-			} else {
-				// No supported VRAM compression formats, decompress.
-				basisu_format = basist::transcoder_texture_format::cTFRGBA32;
-				image_format = Image::FORMAT_RGBA8;
-			}
-		} break;
 	}
 
 	src_ptr += 4;
@@ -249,6 +267,11 @@ Ref<Image> basis_universal_unpacker_ptr(const uint8_t *p_data, int p_size) {
 	}
 
 	image = Image::create_from_data(basisu_info.m_width, basisu_info.m_height, basisu_info.m_total_levels > 1, image_format, out_data);
+
+	if (needs_ra_rg_swap) {
+		// Swap uncompressed RG texture's channels.
+		image->convert_ra_rgba8_to_rg();
+	}
 
 	return image;
 }
