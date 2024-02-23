@@ -610,7 +610,7 @@ Error ResourceImporterTexture::import(const String &p_source_file, const String 
 		// Must import in all formats, in order of priority (so platform choses the best supported one. IE, etc2 over etc).
 		// Android, GLES 2.x
 
-		const bool is_hdr = (image->get_format() >= Image::FORMAT_RF && image->get_format() <= Image::FORMAT_RGBE9995);
+		const bool is_hdr = image->is_hdr();
 		const bool can_s3tc_bptc = ResourceImporterTextureSettings::should_import_s3tc_bptc();
 		const bool can_etc2_astc = ResourceImporterTextureSettings::should_import_etc2_astc();
 

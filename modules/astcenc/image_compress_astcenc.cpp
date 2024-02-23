@@ -41,13 +41,12 @@ void _compress_astc(Image *r_img, Image::ASTCFormat p_format) {
 	// TODO: See how to handle lossy quality.
 
 	Image::Format img_format = r_img->get_format();
-	if (img_format >= Image::FORMAT_DXT1) {
+	if (Image::is_format_compressed(img_format)) {
 		return; // Do not compress, already compressed.
 	}
 
-	bool is_hdr = false;
-	if ((img_format >= Image::FORMAT_RH) && (img_format <= Image::FORMAT_RGBE9995)) {
-		is_hdr = true;
+	const bool is_hdr = Image::is_format_hdr(img_format);
+	if (is_hdr) {
 		r_img->convert(Image::FORMAT_RGBAF);
 	} else {
 		r_img->convert(Image::FORMAT_RGBA8);

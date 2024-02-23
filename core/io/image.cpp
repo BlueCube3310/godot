@@ -521,7 +521,7 @@ void Image::convert(Format p_new_format) {
 	// Includes the main image.
 	const int mipmap_count = get_mipmap_count() + 1;
 
-	if (format > FORMAT_RGBE9995 || p_new_format > FORMAT_RGBE9995) {
+	if (is_compressed() || is_format_compressed(p_new_format)) {
 		ERR_FAIL_MSG("Cannot convert to <-> from compressed formats. Use compress() and decompress() instead.");
 
 	} else if (format > FORMAT_RGBA8 || p_new_format > FORMAT_RGBA8) {
@@ -1662,7 +1662,7 @@ int Image::_get_dst_image_size(int p_width, int p_height, Format p_format, int &
 }
 
 bool Image::_can_modify(Format p_format) const {
-	return p_format <= FORMAT_RGBE9995;
+	return !is_compressed();
 }
 
 template <class Component, int CC, bool renormalize,
@@ -2616,7 +2616,21 @@ int Image::get_image_mipmap_offset_and_dimensions(int p_width, int p_height, For
 }
 
 bool Image::is_compressed() const {
-	return format > FORMAT_RGBE9995;
+	return is_format_compressed(format);
+}
+
+bool Image::is_format_compressed(Format p_format) {
+	return p_format > FORMAT_RGBE9995;
+}
+
+bool Image::is_hdr() const {
+	return is_format_hdr(format);
+}
+
+bool Image::is_format_hdr(Format p_format) {
+	return (p_format >= FORMAT_RF && p_format <= FORMAT_RGBE9995) ||
+			(p_format == FORMAT_BPTC_RGBF || p_format == FORMAT_BPTC_RGBFU ||
+					p_format == FORMAT_ASTC_4x4_HDR || p_format == FORMAT_ASTC_8x8_HDR);
 }
 
 Error Image::decompress() {
@@ -3464,6 +3478,10 @@ void Image::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("compress_from_channels", "mode", "channels", "astc_format"), &Image::compress_from_channels, DEFVAL(ASTC_FORMAT_4x4));
 	ClassDB::bind_method(D_METHOD("decompress"), &Image::decompress);
 	ClassDB::bind_method(D_METHOD("is_compressed"), &Image::is_compressed);
+	ClassDB::bind_static_method("Image", D_METHOD("is_format_compressed", "format"), &Image::is_format_compressed);
+
+	ClassDB::bind_method(D_METHOD("is_hdr"), &Image::is_hdr);
+	ClassDB::bind_static_method("Image", D_METHOD("is_format_hdr", "format"), &Image::is_format_hdr);
 
 	ClassDB::bind_method(D_METHOD("rotate_90", "direction"), &Image::rotate_90);
 	ClassDB::bind_method(D_METHOD("rotate_180"), &Image::rotate_180);
@@ -4064,8 +4082,8 @@ Dictionary Image::compute_image_metrics(const Ref<Image> p_compared_image, bool 
 
 	ERR_FAIL_COND_V(err != OK, result);
 
-	ERR_FAIL_COND_V_MSG((compared_image->get_format() >= Image::FORMAT_RH) && (compared_image->get_format() <= Image::FORMAT_RGBE9995), result, "Metrics on HDR images are not supported.");
-	ERR_FAIL_COND_V_MSG((source_image->get_format() >= Image::FORMAT_RH) && (source_image->get_format() <= Image::FORMAT_RGBE9995), result, "Metrics on HDR images are not supported.");
+	ERR_FAIL_COND_V_MSG(compared_image->is_hdr(), result, "Metrics on HDR images are not supported.");
+	ERR_FAIL_COND_V_MSG(source_image->is_hdr(), result, "Metrics on HDR images are not supported.");
 
 	double image_metric_max, image_metric_mean, image_metric_mean_squared, image_metric_root_mean_squared, image_metric_peak_snr = 0.0;
 	const bool average_component_error = true;

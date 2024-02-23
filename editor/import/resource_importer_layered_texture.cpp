@@ -513,7 +513,7 @@ void ResourceImporterLayeredTexture::_check_compress_ctex(const String &p_source
 
 	bool can_compress_hdr = r_texture_import->hdr_compression > 0;
 	ERR_FAIL_NULL(r_texture_import->image);
-	bool is_hdr = (r_texture_import->image->get_format() >= Image::FORMAT_RF && r_texture_import->image->get_format() <= Image::FORMAT_RGBE9995);
+	bool is_hdr = r_texture_import->image->is_hdr();
 	ERR_FAIL_NULL(r_texture_import->slices);
 	// Can compress hdr, but hdr with alpha is not compressible.
 	bool use_uncompressed = false;

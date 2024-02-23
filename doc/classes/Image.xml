@@ -299,6 +299,26 @@
 				Returns [code]true[/code] if the image has no data.
 			</description>
 		</method>
+		<method name="is_format_compressed" qualifiers="static">
+			<return type="bool" />
+			<param index="0" name="format" type="int" enum="Image.Format" />
+			<description>
+				Returns [code]true[/code] if the format is compressed.
+			</description>
+		</method>
+		<method name="is_format_hdr" qualifiers="static">
+			<return type="bool" />
+			<param index="0" name="format" type="int" enum="Image.Format" />
+			<description>
+				Returns [code]true[/code] if the format can store color data in the HDR color space.
+			</description>
+		</method>
+		<method name="is_hdr" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the image can store color data in the HDR color space.
+			</description>
+		</method>
 		<method name="is_invisible" qualifiers="const">
 			<return type="bool" />
 			<description>
