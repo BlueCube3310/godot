@@ -159,7 +159,7 @@ public:
 	static void (*_image_compress_etc2_func)(Image *, UsedChannels p_channels);
 	static void (*_image_compress_astc_func)(Image *, ASTCFormat p_format);
 
-	static void (*_image_compress_bptc_rd_func)(Image *, UsedChannels p_channels);
+	static void (*_image_compress_bptc_rd_func)(Vector<Image *>, UsedChannels p_channels);
 
 	static void (*_image_decompress_bc)(Image *);
 	static void (*_image_decompress_bptc)(Image *);
@@ -374,6 +374,7 @@ public:
 		COMPRESS_SOURCE_MAX,
 	};
 
+	static Error batch_compress(Vector<Image *> p_images, CompressMode p_mode, UsedChannels p_channels, ASTCFormat p_astc_format);
 	Error compress(CompressMode p_mode, CompressSource p_source = COMPRESS_SOURCE_GENERIC, ASTCFormat p_astc_format = ASTC_FORMAT_4x4);
 	Error compress_from_channels(CompressMode p_mode, UsedChannels p_channels, ASTCFormat p_astc_format = ASTC_FORMAT_4x4);
 	Error decompress();

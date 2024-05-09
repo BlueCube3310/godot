@@ -2647,17 +2647,51 @@ Error Image::compress(CompressMode p_mode, CompressSource p_source, ASTCFormat p
 	return compress_from_channels(p_mode, detect_used_channels(p_source), p_astc_format);
 }
 
+Error Image::batch_compress(Vector<Image *> p_images, CompressMode p_mode, UsedChannels p_channels, ASTCFormat p_astc_format) {
+	ERR_FAIL_COND_V(p_images.is_empty(), ERR_INVALID_DATA);
+
+	// RenderingDevice only.
+	if (GLOBAL_GET("rendering/textures/vram_compression/compress_with_gpu")) {
+		Vector<Image *> images;
+
+		switch (p_mode) {
+			case COMPRESS_BPTC: {
+				// BC7 is unsupported currently.
+				if (p_images[0]->get_format() >= FORMAT_RF && p_images[0]->get_format() <= FORMAT_RGBE9995) {
+					ERR_FAIL_NULL_V(_image_compress_bptc_rd_func, ERR_UNAVAILABLE);
+					_image_compress_bptc_rd_func(p_images, p_channels);
+
+					return OK;
+				}
+
+			} break;
+
+			default: {
+			}
+		}
+	} else {
+		for (int i = 0; i < p_images.size(); i++) {
+			p_images[i]->compress_from_channels(p_mode, p_channels, p_astc_format);
+		}
+	}
+
+	return OK;
+}
+
 Error Image::compress_from_channels(CompressMode p_mode, UsedChannels p_channels, ASTCFormat p_astc_format) {
 	ERR_FAIL_COND_V(data.is_empty(), ERR_INVALID_DATA);
 
 	// RenderingDevice only.
 	if (GLOBAL_GET("rendering/textures/vram_compression/compress_with_gpu")) {
+		Vector<Image *> images;
+		images.push_back(this);
+
 		switch (p_mode) {
 			case COMPRESS_BPTC: {
 				// BC7 is unsupported currently.
 				if (format >= FORMAT_RF && format <= FORMAT_RGBE9995) {
 					ERR_FAIL_NULL_V(_image_compress_bptc_rd_func, ERR_UNAVAILABLE);
-					_image_compress_bptc_rd_func(this, p_channels);
+					_image_compress_bptc_rd_func(images, p_channels);
 
 					return OK;
 				}
@@ -3050,7 +3084,7 @@ void (*Image::_image_compress_bptc_func)(Image *, Image::UsedChannels) = nullptr
 void (*Image::_image_compress_etc1_func)(Image *) = nullptr;
 void (*Image::_image_compress_etc2_func)(Image *, Image::UsedChannels) = nullptr;
 void (*Image::_image_compress_astc_func)(Image *, Image::ASTCFormat) = nullptr;
-void (*Image::_image_compress_bptc_rd_func)(Image *, Image::UsedChannels) = nullptr;
+void (*Image::_image_compress_bptc_rd_func)(Vector<Image *>, Image::UsedChannels) = nullptr;
 void (*Image::_image_decompress_bc)(Image *) = nullptr;
 void (*Image::_image_decompress_bptc)(Image *) = nullptr;
 void (*Image::_image_decompress_etc1)(Image *) = nullptr;

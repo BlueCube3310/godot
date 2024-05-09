@@ -151,16 +151,16 @@ void _compress_betsy(BetsyFormat p_format, Image *r_img) {
 	String version = "";
 
 	switch (p_format) {
-		case BETSY_FORMAT_BC6: {
+		case BETSY_FORMAT_BC6U: {
 			err = compute_shader->parse_versions_from_text(bc6h_shader_glsl);
+			dest_format = Image::FORMAT_BPTC_RGBFU;
+			version = "unsigned";
+		} break;
 
-			if (is_image_signed(r_img)) {
-				dest_format = Image::FORMAT_BPTC_RGBF;
-				version = "signed";
-			} else {
-				dest_format = Image::FORMAT_BPTC_RGBFU;
-				version = "unsigned";
-			}
+		case BETSY_FORMAT_BC6S: {
+			err = compute_shader->parse_versions_from_text(bc6h_shader_glsl);
+			dest_format = Image::FORMAT_BPTC_RGBF;
+			version = "signed";
 
 		} break;
 
@@ -229,7 +229,8 @@ void _compress_betsy(BetsyFormat p_format, Image *r_img) {
 			break;
 
 		case Image::FORMAT_RGBF:
-			src_texture_format.format = RD::DATA_FORMAT_R32G32B32_SFLOAT;
+			fast_conv_rgb_rgba<Image::FORMAT_RGBAF>(r_img);
+			src_texture_format.format = RD::DATA_FORMAT_R32G32B32A32_SFLOAT;
 			break;
 
 		case Image::FORMAT_RGBAF:
@@ -364,10 +365,21 @@ void _compress_betsy(BetsyFormat p_format, Image *r_img) {
 	print_verbose(vformat("Betsy: Encoding took %d ms.", OS::get_singleton()->get_ticks_msec() - start_time));
 }
 
-void _betsy_compress_bptc(Image *r_img, Image::UsedChannels p_channels) {
-	Image::Format format = r_img->get_format();
+void _betsy_compress_bptc(Vector<Image *> r_layers, Image::UsedChannels p_channels) {
+	Image::Format format = r_layers[0]->get_format();
+
+	bool is_signed = false;
+
+	for (int i = 0; i < r_layers.size(); i++) {
+		if (is_image_signed(r_layers[i])) {
+			is_signed = true;
+			break;
+		}
+	}
 
 	if (format >= Image::FORMAT_RF && format <= Image::FORMAT_RGBE9995) {
-		_compress_betsy(BETSY_FORMAT_BC6, r_img);
+		for (int i = 0; i < r_layers.size(); i++) {
+			_compress_betsy(is_signed ? BETSY_FORMAT_BC6S : BETSY_FORMAT_BC6U, r_layers.write[i]);
+		}
 	}
 }

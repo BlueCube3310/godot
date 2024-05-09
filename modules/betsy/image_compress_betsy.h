@@ -34,11 +34,12 @@
 #include "core/io/image.h"
 
 enum BetsyFormat {
-	BETSY_FORMAT_BC6,
+	BETSY_FORMAT_BC6U,
+	BETSY_FORMAT_BC6S,
 };
 
 void _compress_betsy(BetsyFormat p_format, Image *r_img);
 
-void _betsy_compress_bptc(Image *r_img, Image::UsedChannels p_channels);
+void _betsy_compress_bptc(Vector<Image *> r_layers, Image::UsedChannels p_channels);
 
 #endif // IMAGE_COMPRESS_BETSY_H

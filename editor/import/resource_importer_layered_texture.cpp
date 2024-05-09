@@ -276,12 +276,34 @@ void ResourceImporterLayeredTexture::_save_tex(Vector<Ref<Image>> p_images, cons
 	f->store_32(0);
 	f->store_32(0);
 
-	for (int i = 0; i < p_images.size(); i++) {
-		ResourceImporterTexture::save_to_ctex_format(f, p_images[i], ResourceImporterTexture::CompressMode(p_compress_mode), used_channels, p_vram_compression, p_lossy);
-	}
+	if (p_compress_mode == CompressMode::COMPRESS_VRAM_COMPRESSED) {
+		Vector<Image *> images;
+		for (int i = 0; i < p_images.size(); i++) {
+			images.push_back(p_images.write[i].ptr());
+		}
 
-	for (int i = 0; i < mipmap_images.size(); i++) {
-		ResourceImporterTexture::save_to_ctex_format(f, mipmap_images[i], ResourceImporterTexture::CompressMode(p_compress_mode), used_channels, p_vram_compression, p_lossy);
+		Image::batch_compress(images, p_vram_compression, images[0]->detect_used_channels(), Image::ASTC_FORMAT_4x4);
+
+		for (int i = 0; i < images.size(); i++) {
+			f->store_32(CompressedTexture2D::DATA_FORMAT_IMAGE);
+			f->store_16(images[i]->get_width());
+			f->store_16(images[i]->get_height());
+			f->store_32(images[i]->get_mipmap_count());
+			f->store_32(images[i]->get_format());
+
+			int dl = images[i]->data_size();
+			const uint8_t *r = images[i]->ptr();
+			f->store_buffer(r, dl);
+		}
+
+	} else {
+		for (int i = 0; i < p_images.size(); i++) {
+			ResourceImporterTexture::save_to_ctex_format(f, p_images[i], ResourceImporterTexture::CompressMode(p_compress_mode), used_channels, p_vram_compression, p_lossy);
+		}
+
+		for (int i = 0; i < mipmap_images.size(); i++) {
+			ResourceImporterTexture::save_to_ctex_format(f, mipmap_images[i], ResourceImporterTexture::CompressMode(p_compress_mode), used_channels, p_vram_compression, p_lossy);
+		}
 	}
 }
 

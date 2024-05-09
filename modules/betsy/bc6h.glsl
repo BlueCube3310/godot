@@ -176,10 +176,10 @@ float3 Unquantize10(float3 x) {
 
 float3 FinishUnquantize(float3 endpoint0Unq, float3 endpoint1Unq, float weight) {
 	float3 comp = (endpoint0Unq * (64.0f - weight) + endpoint1Unq * weight + 32.0f) * (31.0f / 2048.0f);
-	/*float3 signVal;
-	signVal.x = comp.x >= 0.0f ? 0.0f : 0x8000;
-	signVal.y = comp.y >= 0.0f ? 0.0f : 0x8000;
-	signVal.z = comp.z >= 0.0f ? 0.0f : 0x8000;*/
+	//float3 signVal;
+	//signVal.x = comp.x >= 0.0f ? 0.0f : 0x8000;
+	//signVal.y = comp.y >= 0.0f ? 0.0f : 0x8000;
+	//signVal.z = comp.z >= 0.0f ? 0.0f : 0x8000;
 	//return f16tof32( uint3( signVal + abs( comp ) ) );
 	return f16tof32(uint3(comp));
 }
