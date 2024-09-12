@@ -69,57 +69,46 @@ void TexturePreview::_notification(int p_what) {
 void TexturePreview::_update_metadata_label_text() {
 	const Ref<Texture2D> texture = texture_display->get_texture();
 
-	String format;
+	String format_text;
 	if (Object::cast_to<ImageTexture>(*texture)) {
-		format = Image::get_format_name(Object::cast_to<ImageTexture>(*texture)->get_format());
+		format_text = Image::get_format_name(Object::cast_to<ImageTexture>(*texture)->get_format());
 	} else if (Object::cast_to<CompressedTexture2D>(*texture)) {
-		format = Image::get_format_name(Object::cast_to<CompressedTexture2D>(*texture)->get_format());
+		format_text = Image::get_format_name(Object::cast_to<CompressedTexture2D>(*texture)->get_format());
 	} else {
-		format = texture->get_class();
+		format_text = texture->get_class();
 	}
 
 	const Ref<Image> image = texture->get_image();
 	if (image.is_valid()) {
 		const int mipmaps = image->get_mipmap_count();
-		// Avoid signed integer overflow that could occur with huge texture sizes by casting everything to uint64_t.
-		uint64_t memory = uint64_t(image->get_width()) * uint64_t(image->get_height()) * uint64_t(Image::get_format_pixel_size(image->get_format()));
-		// Handle VRAM-compressed formats that are stored with 4 bpp.
-		memory >>= Image::get_format_pixel_rshift(image->get_format());
-
-		float mipmaps_multiplier = 1.0;
-		float mipmap_increase = 0.25;
-		for (int i = 0; i < mipmaps; i++) {
-			// Each mip adds 25% memory usage of the previous one.
-			// With a complete mipmap chain, memory usage increases by ~33%.
-			mipmaps_multiplier += mipmap_increase;
-			mipmap_increase *= 0.25;
-		}
-		memory *= mipmaps_multiplier;
+		const int64_t memory = image->get_data_size();
 
 		if (mipmaps >= 1) {
 			metadata_label->set_text(
 					vformat(String::utf8("%d×%d %s\n") + TTR("%s Mipmaps") + "\n" + TTR("Memory: %s"),
-							texture->get_width(),
-							texture->get_height(),
-							format,
+							image->get_width(),
+							image->get_height(),
+							format_text,
 							mipmaps,
 							String::humanize_size(memory)));
+
 		} else {
 			// "No Mipmaps" is easier to distinguish than "0 Mipmaps",
 			// especially since 0, 6, and 8 look quite close with the default code font.
 			metadata_label->set_text(
 					vformat(String::utf8("%d×%d %s\n") + TTR("No Mipmaps") + "\n" + TTR("Memory: %s"),
-							texture->get_width(),
-							texture->get_height(),
-							format,
+							image->get_width(),
+							image->get_height(),
+							format_text,
 							String::humanize_size(memory)));
 		}
+
 	} else {
 		metadata_label->set_text(
 				vformat(String::utf8("%d×%d %s"),
-						texture->get_width(),
-						texture->get_height(),
-						format));
+						image->get_width(),
+						image->get_height(),
+						format_text));
 	}
 }
 
