@@ -236,15 +236,10 @@ void TextureLayeredEditor::_notification(int p_what) {
 		case NOTIFICATION_RESIZED: {
 			_texture_rect_update_area();
 		} break;
-
-		case NOTIFICATION_DRAW: {
-			Ref<Texture2D> checkerboard = get_editor_theme_icon(SNAME("Checkerboard"));
-			Size2 size = get_size();
-
-			draw_texture_rect(checkerboard, Rect2(Point2(), size), true);
-		} break;
-
+		case NOTIFICATION_ENTER_TREE:
 		case NOTIFICATION_THEME_CHANGED: {
+			checkerboard->set_texture(get_editor_theme_icon(SNAME("Checkerboard")));
+			cached_outline_color = get_theme_color(SNAME("extra_border_color_1"), EditorStringName(Editor));
 			if (info) {
 				Ref<Font> metadata_label_font = get_theme_font(SNAME("expression"), EditorStringName(EditorFonts));
 				info->add_theme_font_override(SceneStringName(font), metadata_label_font);
@@ -296,6 +291,12 @@ void TextureLayeredEditor::on_selected_channels_changed() {
 	_update_material(false);
 }
 
+void TextureLayeredEditor::_draw_outline() {
+	const float outline_width = Math::round(EDSCALE);
+	const Rect2 outline_rect = Rect2(Vector2(), outline_overlay->get_size()).grow(outline_width * 0.5);
+	outline_overlay->draw_rect(outline_rect, cached_outline_color, false, outline_width);
+}
+
 void TextureLayeredEditor::_make_shaders() {
 	shaders[0].instantiate();
 	shaders[0]->set_code(array_2d_shader);
@@ -335,6 +336,10 @@ void TextureLayeredEditor::_texture_rect_update_area() {
 
 	texture_rect->set_position(Vector2(ofs_x, ofs_y));
 	texture_rect->set_size(Vector2(tex_width, tex_height));
+	checkerboard->set_position(Vector2(ofs_x, ofs_y));
+	checkerboard->set_size(Vector2(tex_width, tex_height));
+	outline_overlay->set_position(Vector2(ofs_x, ofs_y));
+	outline_overlay->set_size(Vector2(tex_width, tex_height));
 }
 
 void TextureLayeredEditor::edit(Ref<TextureLayered> p_texture) {
@@ -373,11 +378,22 @@ TextureLayeredEditor::TextureLayeredEditor() {
 	set_texture_repeat(TextureRepeat::TEXTURE_REPEAT_ENABLED);
 	set_custom_minimum_size(Size2(0, 256.0) * EDSCALE);
 
+	checkerboard = memnew(TextureRect);
+	checkerboard->set_expand_mode(TextureRect::EXPAND_IGNORE_SIZE);
+	checkerboard->set_stretch_mode(TextureRect::STRETCH_TILE);
+	checkerboard->set_texture_repeat(CanvasItem::TEXTURE_REPEAT_ENABLED);
+	add_child(checkerboard);
+
 	texture_rect = memnew(Control);
 	texture_rect->set_mouse_filter(MOUSE_FILTER_IGNORE);
 	texture_rect->connect(SceneStringName(draw), callable_mp(this, &TextureLayeredEditor::_texture_rect_draw));
-
 	add_child(texture_rect);
+
+	// Creating a separate control so it is not affected by the filtering shader.
+	outline_overlay = memnew(Control);
+	add_child(outline_overlay);
+
+	outline_overlay->connect(SceneStringName(draw), callable_mp(this, &TextureLayeredEditor::_draw_outline));
 
 	layer = memnew(SpinBox);
 	layer->set_step(1);
@@ -388,7 +404,6 @@ TextureLayeredEditor::TextureLayeredEditor() {
 	layer->set_anchor(SIDE_RIGHT, 1);
 	layer->set_anchor(SIDE_LEFT, 1);
 	layer->connect(SceneStringName(value_changed), callable_mp(this, &TextureLayeredEditor::_layer_changed));
-
 	add_child(layer);
 
 	channel_selector = memnew(ColorChannelSelector);

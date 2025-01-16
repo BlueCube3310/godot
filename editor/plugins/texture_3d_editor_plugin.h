@@ -34,6 +34,7 @@
 #include "editor/editor_inspector.h"
 #include "editor/plugins/editor_plugin.h"
 #include "scene/gui/spin_box.h"
+#include "scene/gui/texture_rect.h"
 #include "scene/resources/shader.h"
 #include "scene/resources/texture.h"
 
@@ -49,11 +50,15 @@ class Texture3DEditor : public Control {
 	Ref<Shader> shader;
 	Ref<ShaderMaterial> material;
 
+	Control *outline_overlay = nullptr;
 	Control *texture_rect = nullptr;
+	TextureRect *checkerboard = nullptr;
 
-	ColorChannelSelector *channel_selector = nullptr;
+	Color cached_outline_color;
 
 	bool setting = false;
+
+	ColorChannelSelector *channel_selector = nullptr;
 
 	void _make_shaders();
 
@@ -72,6 +77,8 @@ class Texture3DEditor : public Control {
 	void _update_gui();
 
 	void on_selected_channels_changed();
+
+	void _draw_outline();
 
 protected:
 	void _notification(int p_what);
