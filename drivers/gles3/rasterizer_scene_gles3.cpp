@@ -489,6 +489,12 @@ void RasterizerSceneGLES3::_free_sky_data(Sky *p_sky) {
 		p_sky->raw_radiance = 0;
 		glDeleteFramebuffers(1, &p_sky->radiance_framebuffer);
 		p_sky->radiance_framebuffer = 0;
+		for (int i = 0; i < 4; i++) {
+			GLES3::Utilities::get_singleton()->texture_free_data(p_sky->radiance_sh_textures[i]);
+			p_sky->radiance_sh_textures[i] = 0;
+		}
+		glDeleteFramebuffers(1, &p_sky->radiance_sh_framebuffer);
+		p_sky->radiance_sh_framebuffer = 0;
 	}
 }
 
@@ -594,8 +600,24 @@ void RasterizerSceneGLES3::_update_dirty_skys() {
 			sky->mipmap_count = Image::get_image_required_mipmaps(sky->radiance_size, sky->radiance_size, Image::FORMAT_RGBA8) - 1;
 			// Left uninitialized, will attach a texture at render time
 			glGenFramebuffers(1, &sky->radiance_framebuffer);
+			glGenFramebuffers(1, &sky->radiance_sh_framebuffer);
 			sky->radiance = _init_radiance_texture(sky->radiance_size, sky->mipmap_count, "Sky radiance texture");
 			sky->raw_radiance = _init_radiance_texture(sky->radiance_size, sky->mipmap_count, "Sky raw radiance texture");
+
+			glGenTextures(4, sky->radiance_sh_textures);
+			for (int i = 0; i < 4; i++) {
+				glBindTexture(GL_TEXTURE_2D, sky->radiance_sh_textures[i]);
+				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, 4, 4, 0, GL_RGBA, GL_HALF_FLOAT, nullptr);
+
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+
+				GLES3::Utilities::get_singleton()->texture_allocated_data(sky->radiance_sh_textures[i], Image::get_image_data_size(4, 4, Image::FORMAT_RGBAH, false), vformat("Radiance SH (%d)", i));
+			}
 		}
 
 		sky->reflection_dirty = true;
@@ -989,6 +1011,42 @@ void RasterizerSceneGLES3::_update_sky_radiance(RID p_env, const Projection &p_p
 		} else {
 			cubemap_filter->filter_radiance(sky->raw_radiance, sky->radiance, sky->radiance_framebuffer, sky->radiance_size, sky->mipmap_count, 0); // Just copy over the first mipmap.
 		}
+
+		cubemap_filter->generate_sh(sky->raw_radiance, sky->radiance_sh_framebuffer, sky->radiance_sh_textures);
+
+		if (sky->radiance != 0) {
+			// Create a dummy texture so we can use texture_2d_get.
+			GLES3::Texture texture;
+			texture.width = 4;
+			texture.height = 4;
+			texture.alloc_width = 4;
+			texture.alloc_height = 4;
+			texture.format = Image::FORMAT_RGBAH;
+			texture.real_format = Image::FORMAT_RGBAH;
+			texture.gl_format_cache = GL_RGBA;
+			texture.gl_type_cache = GL_HALF_FLOAT;
+			texture.type = GLES3::Texture::TYPE_2D;
+			texture.target = GL_TEXTURE_2D;
+			texture.active = true;
+			texture.is_render_target = true; // HACK: Prevent TextureStorage from retaining a cached copy of the texture.
+
+			for (int i = 0; i < 4; i++) {
+				RID tex_rid = GLES3::TextureStorage::get_singleton()->texture_allocate();
+
+				texture.tex_id = sky->radiance_sh_textures[i];
+				GLES3::TextureStorage::get_singleton()->texture_2d_initialize_from_texture(tex_rid, texture);
+
+				Ref<Image> img = GLES3::TextureStorage::get_singleton()->texture_2d_get(tex_rid);
+
+				GLES3::Texture &texref = *GLES3::TextureStorage::get_singleton()->get_texture(tex_rid);
+				texref.is_render_target = false; // HACK: Avoid an error when freeing the texture.
+				texref.tex_id = 0;
+				GLES3::TextureStorage::get_singleton()->texture_free(tex_rid);
+
+				sky->radiance_sh[i] = img->get_pixel(0, 0);
+			}
+		}
+
 		sky->processing_layer = 1;
 		sky->baked_exposure = p_sky_energy_multiplier;
 		sky->reflection_dirty = false;
@@ -3354,6 +3412,14 @@ void RasterizerSceneGLES3::_render_list_template(RenderListParameters *p_params,
 			// Pass in lighting uniforms.
 			if constexpr (p_pass_mode == PASS_MODE_COLOR || p_pass_mode == PASS_MODE_COLOR_TRANSPARENT) {
 				GLES3::Config *config = GLES3::Config::get_singleton();
+
+				if (p_render_data->environment.is_valid()) {
+					Sky *sky = sky_owner.get_or_null(environment_get_sky(p_render_data->environment));
+					if (sky) {
+						glUniform4fv(material_storage->shaders.scene_shader.version_get_uniform(SceneShaderGLES3::IRRADIANCE_SH, shader->version, instance_variant, spec_constants), 4, reinterpret_cast<const GLfloat *>(sky->radiance_sh));
+					}
+				}
+
 				// Pass light and shadow index and bind shadow texture.
 				if (uses_additive_lighting) {
 					if (pass < int32_t(inst->light_passes.size())) {

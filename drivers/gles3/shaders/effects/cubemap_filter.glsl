@@ -3,6 +3,7 @@
 
 mode_default =
 mode_copy = #define MODE_DIRECT_WRITE
+mode_sh = #define MODE_SPHERICAL_HARMONICS
 
 #[specializations]
 
@@ -28,6 +29,8 @@ uniform samplerCube source_cube; //texunit:0
 
 /* clang-format on */
 
+#ifndef MODE_SPHERICAL_HARMONICS
+
 uniform int face_id;
 
 #ifndef MODE_DIRECT_WRITE
@@ -36,9 +39,18 @@ uniform vec4 sample_directions_mip[MAX_SAMPLE_COUNT];
 uniform float weight;
 #endif
 
+#endif // !MODE_SPHERICAL_HARMONICS
+
 in highp vec2 uv_interp;
 
+#ifndef MODE_SPHERICAL_HARMONICS
 layout(location = 0) out vec4 frag_color;
+#else // !MODE_SPHERICAL_HARMONICS
+layout(location = 0) out vec4 sh_l0;
+layout(location = 1) out vec4 sh_l1n;
+layout(location = 2) out vec4 sh_l10;
+layout(location = 3) out vec4 sh_l1p;
+#endif // MODE_SPHERICAL_HARMONICS
 
 #define M_PI 3.14159265359
 
@@ -90,6 +102,7 @@ vec3 texelCoordToVec(vec2 uv, int faceID) {
 }
 
 void main() {
+#ifndef MODE_SPHERICAL_HARMONICS
 	vec3 color = vec3(0.0);
 	vec2 uv = uv_interp;
 	vec3 N = texelCoordToVec(uv, face_id);
@@ -119,4 +132,34 @@ void main() {
 	sum.rgb = linear_to_srgb(sum.rgb);
 	frag_color = vec4(sum.rgb, 1.0);
 #endif
+
+#else // !MODE_SPHERICAL_HARMONICS
+	float theta = 0.0;
+	float phi = 0.0;
+
+	vec4 resl0 = vec4(0.0);
+	vec4 resl1n = vec4(0.0);
+	vec4 resl10 = vec4(0.0);
+	vec4 resl1p = vec4(0.0);
+
+	for (uint i = 0u; i < 32u; i++) {
+		for (uint j = 0u; j < 32u; j++) {
+			vec3 N = vec3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
+			vec4 col = textureLod(source_cube, N, 0.0);
+
+			resl0 += col * 0.28209479177387814;
+			resl1n += col * 0.4886025119029199 * N.y;
+			resl10 += col * 0.4886025119029199 * N.z;
+			resl1p += col * 0.4886025119029199 * N.x;
+
+			phi += M_PI / 32;
+		}
+		theta += M_PI / 32;
+	}
+
+	sh_l0 = resl0 / (32 * 32);
+	sh_l1n = resl1n / (32 * 32);
+	sh_l10 = resl10 / (32 * 32);
+	sh_l1p = resl1p / (32 * 32);
+#endif // MODE_SPHERICAL_HARMONICS
 }

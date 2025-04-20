@@ -60,6 +60,8 @@ public:
 	~CubemapFilter();
 
 	void filter_radiance(GLuint p_source_cubemap, GLuint p_dest_cubemap, GLuint p_dest_framebuffer, int p_source_size, int p_mipmap_count, int p_layer);
+
+	void generate_sh(GLuint p_source_cubemap, GLuint p_dest_framebuffer, GLuint p_sh_textures[4]);
 };
 
 } //namespace GLES3

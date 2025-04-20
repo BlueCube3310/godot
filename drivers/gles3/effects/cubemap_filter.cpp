@@ -206,7 +206,38 @@ void CubemapFilter::filter_radiance(GLuint p_source_cubemap, GLuint p_dest_cubem
 
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 	}
+
 	glBindVertexArray(0);
+	glBindFramebuffer(GL_FRAMEBUFFER, GLES3::TextureStorage::system_fbo);
+}
+
+void CubemapFilter::generate_sh(GLuint p_source_cubemap, GLuint p_dest_framebuffer, GLuint p_sh_textures[4]) {
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, p_source_cubemap);
+	glBindFramebuffer(GL_FRAMEBUFFER, p_dest_framebuffer);
+
+	bool success = cubemap_filter.shader.version_bind_shader(cubemap_filter.shader_version, CubemapFilterShaderGLES3::MODE_SH);
+	if (!success) {
+		return;
+	}
+
+	{
+		glViewport(0, 0, 4, 4);
+
+		for (int i = 0; i < 4; i++) {
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, p_sh_textures[i], 0);
+#ifdef DEBUG_ENABLED
+			GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+			if (status != GL_FRAMEBUFFER_COMPLETE) {
+				WARN_PRINT("Could not bind sky radiance face: " + itos(i) + ", status: " + GLES3::TextureStorage::get_singleton()->get_framebuffer_error(status));
+			}
+#endif
+		}
+
+		const GLenum buffers[]{ GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
+		glDrawBuffers(4, buffers);
+	}
+
 	glBindFramebuffer(GL_FRAMEBUFFER, GLES3::TextureStorage::system_fbo);
 }
 

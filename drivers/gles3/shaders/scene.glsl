@@ -882,6 +882,24 @@ in highp vec4 shadow_coord4;
 #define RADIANCE_MAX_LOD 5.0
 
 uniform samplerCube radiance_map; // texunit:-2
+uniform mediump vec4[4] irradiance_sh;
+
+float shEvaluateDiffuseL1Geomerics(vec3 n, int channel) {
+	// http://www.geomerics.com/wp-content/uploads/2015/08/CEDEC_Geomerics_ReconstructingDiffuseLighting1.pdf
+	vec4 sh = vec4(irradiance_sh[0][channel], irradiance_sh[1][channel], irradiance_sh[2][channel], irradiance_sh[3][channel]);
+
+	float R0 = sh[0];
+
+	vec3 R1 = 0.5f * vec3(sh[3], sh[1], sh[2]);
+	float lenR1 = length(R1);
+
+	float q = 0.5f * (1.0f + dot(R1 / lenR1, n));
+
+	float p = 1.0f + 2.0f * lenR1 / R0;
+	float a = (1.0f - lenR1 / R0) / (1.0f + lenR1 / R0);
+
+	return R0 * (a + (1.0f - a) * (p + 1.0f) * pow(q, p));
+}
 
 #endif // USE_RADIANCE_MAP
 
@@ -2040,12 +2058,29 @@ void main() {
 		ambient_light = scene_data.ambient_light_color_energy.rgb;
 
 #ifdef USE_RADIANCE_MAP
-		if (scene_data.use_ambient_cubemap) {
-			vec3 ambient_dir = scene_data.radiance_inverse_xform * normal;
-			vec3 cubemap_ambient = textureLod(radiance_map, ambient_dir, RADIANCE_MAX_LOD).rgb;
-			cubemap_ambient = srgb_to_linear(cubemap_ambient);
-			ambient_light = mix(ambient_light, cubemap_ambient * scene_data.ambient_light_color_energy.a, scene_data.ambient_color_sky_mix);
-		}
+		/*
+				if (scene_data.use_ambient_cubemap) {
+					vec3 ambient_dir = scene_data.radiance_inverse_xform * normal;
+					vec3 cubemap_ambient = textureLod(radiance_map, ambient_dir, RADIANCE_MAX_LOD).rgb;
+					cubemap_ambient = srgb_to_linear(cubemap_ambient);
+					ambient_light = mix(ambient_light, cubemap_ambient * scene_data.ambient_light_color_energy.a, scene_data.ambient_color_sky_mix);
+				}
+				*/
+
+		vec3 ambient_dir = scene_data.radiance_inverse_xform * normal;
+
+		const float c0 = 0.886227;
+		const float c1 = 1.023327;
+		/*
+				vec3 cubemap_ambient = c0 * irradiance_sh[0].rgb +
+					c1 * irradiance_sh[1].rgb * ambient_dir.y +
+					c1 * irradiance_sh[2].rgb * ambient_dir.z +
+					c1 * irradiance_sh[3].rgb * ambient_dir.x;*/
+
+		vec3 cubemap_ambient = vec3(shEvaluateDiffuseL1Geomerics(ambient_dir, 0), shEvaluateDiffuseL1Geomerics(ambient_dir, 1), shEvaluateDiffuseL1Geomerics(ambient_dir, 2));
+
+		ambient_light = mix(ambient_light, cubemap_ambient * scene_data.ambient_light_color_energy.a, scene_data.ambient_color_sky_mix);
+
 #endif // USE_RADIANCE_MAP
 
 #ifndef DISABLE_REFLECTION_PROBE
