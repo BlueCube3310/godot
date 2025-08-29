@@ -542,10 +542,7 @@ Error BetsyCompressor::_compress(BetsyFormat p_format, Image *r_img) {
 
 		if (needs_rgb_to_rgba) {
 			// RGB textures cannot be sampled directly on most hardware, so we do a little trick involving a compute shader that
-			// takes the input data as a R-channel only textureBuffer and converts it into an actual RGBA image.
-
-			RD::TextureFormat rgba_texture_format = src_texture_format;
-			rgba_texture_format.usage_bits |= RD::TEXTURE_USAGE_COLOR_ATTACHMENT_BIT | RD::TEXTURE_USAGE_STORAGE_BIT | RD::TEXTURE_USAGE_CAN_COPY_FROM_BIT | RD::TEXTURE_USAGE_CAN_COPY_TO_BIT | RD::TEXTURE_USAGE_CAN_UPDATE_BIT;
+			// takes the input data as a R-channel only textureArray with 3 layers and converts its data to RGBA.
 
 			BetsyShaderType rgb_shader_type = BETSY_SHADER_MAX;
 			RD::DataFormat rgb_source_format = RD::DATA_FORMAT_MAX;
@@ -570,14 +567,41 @@ Error BetsyCompressor::_compress(BetsyFormat p_format, Image *r_img) {
 					break;
 			}
 
-			RID rgb_source_tex = compress_rd->texture_buffer_create(width * height * 3, rgb_source_format, src_image_ptr[0].span());
+			RD::TextureFormat rgb_texture_format = src_texture_format;
+			rgb_texture_format.format = rgb_source_format;
+			rgb_texture_format.array_layers = 3;
+			rgb_texture_format.texture_type = RD::TEXTURE_TYPE_2D_ARRAY;
+
+			RD::TextureFormat rgba_texture_format = src_texture_format;
+			rgba_texture_format.usage_bits |= RD::TEXTURE_USAGE_COLOR_ATTACHMENT_BIT | RD::TEXTURE_USAGE_STORAGE_BIT | RD::TEXTURE_USAGE_CAN_COPY_FROM_BIT | RD::TEXTURE_USAGE_CAN_COPY_TO_BIT | RD::TEXTURE_USAGE_CAN_UPDATE_BIT;
+
+			// The source 'RGB' texture.
+			RID rgb_source_tex = compress_rd->texture_create(rgb_texture_format, RD::TextureView());
+			//RID rgb_source_tex = compress_rd->texture_buffer_create(width * height * 3, rgb_source_format, src_image_ptr[0].span());
+
+			{
+				const int64_t rgb_layer_size = width * height * RD::get_image_format_pixel_size(rgb_source_format);
+				int64_t rgb_offset = 0;
+
+				Vector<uint8_t> rgb_layer_data;
+				rgb_layer_data.resize(rgb_layer_size);
+
+				for (int layer_i = 0; layer_i < 3; layer_i++) {
+					memcpy(rgb_layer_data.ptrw(), src_image_ptr[0].ptr() + rgb_offset, rgb_layer_size);
+					compress_rd->_texture_initialize(rgb_source_tex, layer_i, rgb_layer_data);
+
+					rgb_offset += rgb_layer_size;
+				}
+			}
+
 			src_texture = compress_rd->texture_create(rgba_texture_format, RD::TextureView());
 
 			Vector<RD::Uniform> uniforms;
 			{
 				{
 					RD::Uniform u;
-					u.uniform_type = RD::UNIFORM_TYPE_TEXTURE_BUFFER;
+					//u.uniform_type = RD::UNIFORM_TYPE_TEXTURE_BUFFER;
+					u.uniform_type = RD::UNIFORM_TYPE_TEXTURE;
 					u.binding = 0;
 					u.append_id(rgb_source_tex);
 					uniforms.push_back(u);
