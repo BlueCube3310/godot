@@ -722,7 +722,8 @@ static inline Error _get_gl_uncompressed_format(const Ref<Image> &p_image, Image
 Ref<Image> TextureStorage::_get_gl_image_and_format(const Ref<Image> &p_image, Image::Format p_format, Image::Format &r_real_format, GLenum &r_gl_format, GLenum &r_gl_internal_format, GLenum &r_gl_type, bool &r_compressed, bool p_force_decompress) const {
 	Config *config = Config::get_singleton();
 	r_gl_format = 0;
-	Ref<Image> image = p_image;
+	r_gl_internal_format = 0;
+	r_gl_type = 0;
 	r_compressed = false;
 	r_real_format = p_format;
 
@@ -739,15 +740,11 @@ Ref<Image> TextureStorage::_get_gl_image_and_format(const Ref<Image> &p_image, I
 
 	// For compressed images, some formats may not be supported by the current device and will require decompression.
 	bool need_decompress = false;
-	bool decompress_ra_to_rg = false;
 
 	switch (p_format) {
 		case Image::FORMAT_DXT1: {
 			if (config->s3tc_supported) {
 				r_gl_internal_format = _EXT_COMPRESSED_RGB_S3TC_DXT1_EXT;
-				r_gl_format = GL_RGB;
-				r_gl_type = GL_UNSIGNED_BYTE;
-				r_compressed = true;
 			} else {
 				need_decompress = true;
 			}
@@ -755,9 +752,6 @@ Ref<Image> TextureStorage::_get_gl_image_and_format(const Ref<Image> &p_image, I
 		case Image::FORMAT_DXT3: {
 			if (config->s3tc_supported) {
 				r_gl_internal_format = _EXT_COMPRESSED_RGBA_S3TC_DXT3_EXT;
-				r_gl_format = GL_RGBA;
-				r_gl_type = GL_UNSIGNED_BYTE;
-				r_compressed = true;
 			} else {
 				need_decompress = true;
 			}
@@ -765,9 +759,6 @@ Ref<Image> TextureStorage::_get_gl_image_and_format(const Ref<Image> &p_image, I
 		case Image::FORMAT_DXT5: {
 			if (config->s3tc_supported) {
 				r_gl_internal_format = _EXT_COMPRESSED_RGBA_S3TC_DXT5_EXT;
-				r_gl_format = GL_RGBA;
-				r_gl_type = GL_UNSIGNED_BYTE;
-				r_compressed = true;
 			} else {
 				need_decompress = true;
 			}
@@ -775,9 +766,6 @@ Ref<Image> TextureStorage::_get_gl_image_and_format(const Ref<Image> &p_image, I
 		case Image::FORMAT_RGTC_R: {
 			if (config->rgtc_supported) {
 				r_gl_internal_format = _EXT_COMPRESSED_RED_RGTC1_EXT;
-				r_gl_format = GL_RGBA;
-				r_gl_type = GL_UNSIGNED_BYTE;
-				r_compressed = true;
 			} else {
 				need_decompress = true;
 			}
@@ -785,9 +773,6 @@ Ref<Image> TextureStorage::_get_gl_image_and_format(const Ref<Image> &p_image, I
 		case Image::FORMAT_RGTC_RG: {
 			if (config->rgtc_supported) {
 				r_gl_internal_format = _EXT_COMPRESSED_RED_GREEN_RGTC2_EXT;
-				r_gl_format = GL_RGBA;
-				r_gl_type = GL_UNSIGNED_BYTE;
-				r_compressed = true;
 			} else {
 				need_decompress = true;
 			}
@@ -795,9 +780,6 @@ Ref<Image> TextureStorage::_get_gl_image_and_format(const Ref<Image> &p_image, I
 		case Image::FORMAT_BPTC_RGBA: {
 			if (config->bptc_supported) {
 				r_gl_internal_format = _EXT_COMPRESSED_RGBA_BPTC_UNORM;
-				r_gl_format = GL_RGBA;
-				r_gl_type = GL_UNSIGNED_BYTE;
-				r_compressed = true;
 			} else {
 				need_decompress = true;
 			}
@@ -805,9 +787,6 @@ Ref<Image> TextureStorage::_get_gl_image_and_format(const Ref<Image> &p_image, I
 		case Image::FORMAT_BPTC_RGBF: {
 			if (config->bptc_supported) {
 				r_gl_internal_format = _EXT_COMPRESSED_RGB_BPTC_SIGNED_FLOAT;
-				r_gl_format = GL_RGB;
-				r_gl_type = GL_FLOAT;
-				r_compressed = true;
 			} else {
 				need_decompress = true;
 			}
@@ -815,9 +794,6 @@ Ref<Image> TextureStorage::_get_gl_image_and_format(const Ref<Image> &p_image, I
 		case Image::FORMAT_BPTC_RGBFU: {
 			if (config->bptc_supported) {
 				r_gl_internal_format = _EXT_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT;
-				r_gl_format = GL_RGB;
-				r_gl_type = GL_FLOAT;
-				r_compressed = true;
 			} else {
 				need_decompress = true;
 			}
@@ -825,9 +801,6 @@ Ref<Image> TextureStorage::_get_gl_image_and_format(const Ref<Image> &p_image, I
 		case Image::FORMAT_ETC2_R11: {
 			if (config->etc2_supported) {
 				r_gl_internal_format = _EXT_COMPRESSED_R11_EAC;
-				r_gl_format = GL_RED;
-				r_gl_type = GL_UNSIGNED_BYTE;
-				r_compressed = true;
 			} else {
 				need_decompress = true;
 			}
@@ -835,9 +808,6 @@ Ref<Image> TextureStorage::_get_gl_image_and_format(const Ref<Image> &p_image, I
 		case Image::FORMAT_ETC2_R11S: {
 			if (config->etc2_supported) {
 				r_gl_internal_format = _EXT_COMPRESSED_SIGNED_R11_EAC;
-				r_gl_format = GL_RED;
-				r_gl_type = GL_UNSIGNED_BYTE;
-				r_compressed = true;
 			} else {
 				need_decompress = true;
 			}
@@ -845,9 +815,6 @@ Ref<Image> TextureStorage::_get_gl_image_and_format(const Ref<Image> &p_image, I
 		case Image::FORMAT_ETC2_RG11: {
 			if (config->etc2_supported) {
 				r_gl_internal_format = _EXT_COMPRESSED_RG11_EAC;
-				r_gl_format = GL_RG;
-				r_gl_type = GL_UNSIGNED_BYTE;
-				r_compressed = true;
 			} else {
 				need_decompress = true;
 			}
@@ -855,9 +822,6 @@ Ref<Image> TextureStorage::_get_gl_image_and_format(const Ref<Image> &p_image, I
 		case Image::FORMAT_ETC2_RG11S: {
 			if (config->etc2_supported) {
 				r_gl_internal_format = _EXT_COMPRESSED_SIGNED_RG11_EAC;
-				r_gl_format = GL_RG;
-				r_gl_type = GL_UNSIGNED_BYTE;
-				r_compressed = true;
 			} else {
 				need_decompress = true;
 			}
@@ -866,9 +830,6 @@ Ref<Image> TextureStorage::_get_gl_image_and_format(const Ref<Image> &p_image, I
 		case Image::FORMAT_ETC2_RGB8: {
 			if (config->etc2_supported) {
 				r_gl_internal_format = _EXT_COMPRESSED_RGB8_ETC2;
-				r_gl_format = GL_RGB;
-				r_gl_type = GL_UNSIGNED_BYTE;
-				r_compressed = true;
 			} else {
 				need_decompress = true;
 			}
@@ -876,9 +837,6 @@ Ref<Image> TextureStorage::_get_gl_image_and_format(const Ref<Image> &p_image, I
 		case Image::FORMAT_ETC2_RGBA8: {
 			if (config->etc2_supported) {
 				r_gl_internal_format = _EXT_COMPRESSED_RGBA8_ETC2_EAC;
-				r_gl_format = GL_RGBA;
-				r_gl_type = GL_UNSIGNED_BYTE;
-				r_compressed = true;
 			} else {
 				need_decompress = true;
 			}
@@ -886,9 +844,6 @@ Ref<Image> TextureStorage::_get_gl_image_and_format(const Ref<Image> &p_image, I
 		case Image::FORMAT_ETC2_RGB8A1: {
 			if (config->etc2_supported) {
 				r_gl_internal_format = _EXT_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2;
-				r_gl_format = GL_RGBA;
-				r_gl_type = GL_UNSIGNED_BYTE;
-				r_compressed = true;
 			} else {
 				need_decompress = true;
 			}
@@ -897,36 +852,25 @@ Ref<Image> TextureStorage::_get_gl_image_and_format(const Ref<Image> &p_image, I
 #ifndef WEB_ENABLED
 			if (config->etc2_supported) {
 				r_gl_internal_format = _EXT_COMPRESSED_RGBA8_ETC2_EAC;
-				r_gl_format = GL_RGBA;
-				r_gl_type = GL_UNSIGNED_BYTE;
-				r_compressed = true;
 			} else
 #endif
 			{
 				need_decompress = true;
 			}
-			decompress_ra_to_rg = true;
 		} break;
 		case Image::FORMAT_DXT5_RA_AS_RG: {
 #ifndef WEB_ENABLED
 			if (config->s3tc_supported) {
 				r_gl_internal_format = _EXT_COMPRESSED_RGBA_S3TC_DXT5_EXT;
-				r_gl_format = GL_RGBA;
-				r_gl_type = GL_UNSIGNED_BYTE;
-				r_compressed = true;
 			} else
 #endif
 			{
 				need_decompress = true;
 			}
-			decompress_ra_to_rg = true;
 		} break;
 		case Image::FORMAT_ASTC_4x4: {
 			if (config->astc_supported) {
 				r_gl_internal_format = _EXT_COMPRESSED_RGBA_ASTC_4x4_KHR;
-				r_gl_format = GL_RGBA;
-				r_gl_type = GL_UNSIGNED_BYTE;
-				r_compressed = true;
 			} else {
 				need_decompress = true;
 			}
@@ -934,9 +878,6 @@ Ref<Image> TextureStorage::_get_gl_image_and_format(const Ref<Image> &p_image, I
 		case Image::FORMAT_ASTC_4x4_HDR: {
 			if (config->astc_hdr_supported) {
 				r_gl_internal_format = _EXT_COMPRESSED_RGBA_ASTC_4x4_KHR;
-				r_gl_format = GL_RGBA;
-				r_gl_type = GL_UNSIGNED_BYTE;
-				r_compressed = true;
 			} else {
 				need_decompress = true;
 			}
@@ -944,9 +885,6 @@ Ref<Image> TextureStorage::_get_gl_image_and_format(const Ref<Image> &p_image, I
 		case Image::FORMAT_ASTC_8x8: {
 			if (config->astc_supported) {
 				r_gl_internal_format = _EXT_COMPRESSED_RGBA_ASTC_8x8_KHR;
-				r_gl_format = GL_RGBA;
-				r_gl_type = GL_UNSIGNED_BYTE;
-				r_compressed = true;
 			} else {
 				need_decompress = true;
 			}
@@ -954,9 +892,6 @@ Ref<Image> TextureStorage::_get_gl_image_and_format(const Ref<Image> &p_image, I
 		case Image::FORMAT_ASTC_8x8_HDR: {
 			if (config->astc_hdr_supported) {
 				r_gl_internal_format = _EXT_COMPRESSED_RGBA_ASTC_8x8_KHR;
-				r_gl_format = GL_RGBA;
-				r_gl_type = GL_UNSIGNED_BYTE;
-				r_compressed = true;
 			} else {
 				need_decompress = true;
 			}
@@ -966,26 +901,19 @@ Ref<Image> TextureStorage::_get_gl_image_and_format(const Ref<Image> &p_image, I
 		}
 	}
 
-	if (need_decompress || p_force_decompress) {
-		if (image.is_valid()) {
-			image = image->duplicate();
-			image->decompress();
-			ERR_FAIL_COND_V(image->is_compressed(), image);
+	r_compressed = !need_decompress && !p_force_decompress;
 
-			if (decompress_ra_to_rg) {
-				image->convert_ra_rgba8_to_rg();
-				image->convert(Image::FORMAT_RG8);
-			}
+	if (!r_compressed && p_image.is_valid()) {
+		Ref<Image> image = p_image->duplicate();
+		image->decompress();
+		ERR_FAIL_COND_V(image->is_compressed(), image);
 
-			Error err = _get_gl_uncompressed_format(image, image->get_format(), r_real_format, r_gl_format, r_gl_internal_format, r_gl_type);
-			ERR_FAIL_COND_V_MSG(err != OK, Ref<Image>(), vformat("The image format %d is not supported by the Compatibility renderer.", image->get_format()));
+		Error err = _get_gl_uncompressed_format(image, image->get_format(), r_real_format, r_gl_format, r_gl_internal_format, r_gl_type);
+		ERR_FAIL_COND_V_MSG(err != OK, Ref<Image>(), vformat("The image format %d is not supported by the Compatibility renderer.", image->get_format()));
 
-			r_real_format = image->get_format();
-			r_compressed = false;
-
-			if (p_format != image->get_format()) {
-				WARN_PRINT(vformat("Image format %s not supported by hardware, converting to %s.", Image::get_format_name(p_format), Image::get_format_name(image->get_format())));
-			}
+		r_real_format = image->get_format();
+		if (p_format != r_real_format) {
+			WARN_PRINT(vformat("Image format %s not supported by hardware, converting to %s.", Image::get_format_name(p_format), Image::get_format_name(r_real_format)));
 		}
 
 		return image;
@@ -1560,7 +1488,7 @@ Ref<Image> TextureStorage::texture_2d_get(RID p_texture) const {
 			ERR_FAIL_V_MSG(Ref<Image>(), vformat("Texture %s has no data.", path_str));
 		}
 
-		if (texture->format != texture->real_format && !Image::is_format_compressed(texture->real_format)) {
+		if (texture->format != texture->real_format && !Image::is_format_compressed(texture->format)) {
 			image->convert(texture->format);
 		}
 	}
@@ -1919,7 +1847,7 @@ void TextureStorage::texture_debug_usage(List<RenderingServerTypes::TextureInfo>
 		}
 		RenderingServerTypes::TextureInfo tinfo;
 		tinfo.path = t->path;
-		tinfo.format = t->format;
+		tinfo.format = t->real_format;
 		tinfo.width = t->alloc_width;
 		tinfo.height = t->alloc_height;
 		tinfo.bytes = t->total_data_size;
@@ -1995,11 +1923,6 @@ void TextureStorage::_texture_set_data(RID p_texture, const Ref<Image> &p_image,
 	ERR_FAIL_COND(!p_image->get_width());
 	ERR_FAIL_COND(!p_image->get_height());
 
-	GLenum type;
-	GLenum format;
-	GLenum internal_format;
-	bool compressed = false;
-
 	bool needs_decompress = texture->resize_to_po2;
 
 	// Support for RGTC-compressed Texture Arrays isn't mandated by GLES3/WebGL.
@@ -2009,8 +1932,7 @@ void TextureStorage::_texture_set_data(RID p_texture, const Ref<Image> &p_image,
 		}
 	}
 
-	Image::Format real_format;
-	Ref<Image> img = _get_gl_image_and_format(p_image, p_image->get_format(), real_format, format, internal_format, type, compressed, needs_decompress);
+	Ref<Image> img = _get_gl_image_and_format(p_image, p_image->get_format(), texture->real_format, texture->gl_format_cache, texture->gl_internal_format_cache, texture->gl_type_cache, texture->compressed, needs_decompress);
 	ERR_FAIL_COND(img.is_null());
 	if (texture->resize_to_po2) {
 		if (p_image->is_compressed()) {
@@ -2029,7 +1951,7 @@ void TextureStorage::_texture_set_data(RID p_texture, const Ref<Image> &p_image,
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(texture->target, texture->tex_id);
-	_texture_set_swizzle(texture, real_format);
+	_texture_set_swizzle(texture);
 
 	int mipmaps = img->has_mipmaps() ? img->get_mipmap_count() + 1 : 1;
 
@@ -2050,25 +1972,25 @@ void TextureStorage::_texture_set_data(RID p_texture, const Ref<Image> &p_image,
 	for (int i = 0; i < mipmaps; i++) {
 		int64_t size, ofs;
 		img->get_mipmap_offset_and_size(i, ofs, size);
-		if (compressed) {
+		if (texture->compressed) {
 			glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 			if (texture->target == GL_TEXTURE_2D_ARRAY) {
 				if (p_initialize) {
-					glCompressedTexImage3D(GL_TEXTURE_2D_ARRAY, i, internal_format, w, h, texture->layers, 0, size * texture->layers, nullptr);
+					glCompressedTexImage3D(GL_TEXTURE_2D_ARRAY, i, texture->gl_internal_format_cache, w, h, texture->layers, 0, size * texture->layers, nullptr);
 				}
-				glCompressedTexSubImage3D(GL_TEXTURE_2D_ARRAY, i, 0, 0, p_layer, w, h, 1, internal_format, size, &read[ofs]);
+				glCompressedTexSubImage3D(GL_TEXTURE_2D_ARRAY, i, 0, 0, p_layer, w, h, 1, texture->gl_internal_format_cache, size, &read[ofs]);
 			} else {
-				glCompressedTexImage2D(blit_target, i, internal_format, w, h, 0, size, &read[ofs]);
+				glCompressedTexImage2D(blit_target, i, texture->gl_internal_format_cache, w, h, 0, size, &read[ofs]);
 			}
 		} else {
 			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 			if (texture->target == GL_TEXTURE_2D_ARRAY) {
 				if (p_initialize) {
-					glTexImage3D(GL_TEXTURE_2D_ARRAY, i, internal_format, w, h, texture->layers, 0, format, type, nullptr);
+					glTexImage3D(GL_TEXTURE_2D_ARRAY, i, texture->gl_internal_format_cache, w, h, texture->layers, 0, texture->gl_format_cache, texture->gl_type_cache, nullptr);
 				}
-				glTexSubImage3D(GL_TEXTURE_2D_ARRAY, i, 0, 0, p_layer, w, h, 1, format, type, &read[ofs]);
+				glTexSubImage3D(GL_TEXTURE_2D_ARRAY, i, 0, 0, p_layer, w, h, 1, texture->gl_format_cache, texture->gl_type_cache, &read[ofs]);
 			} else {
-				glTexImage2D(blit_target, i, internal_format, w, h, 0, format, type, &read[ofs]);
+				glTexImage2D(blit_target, i, texture->gl_internal_format_cache, w, h, 0, texture->gl_format_cache, texture->gl_type_cache, &read[ofs]);
 			}
 		}
 
@@ -2098,20 +2020,14 @@ void TextureStorage::_texture_set_3d_data(RID p_texture, const Vector<Ref<Image>
 	ERR_FAIL_COND(texture->target != GL_TEXTURE_3D);
 	ERR_FAIL_COND(p_data.is_empty());
 
-	GLenum type;
-	GLenum format;
-	GLenum internal_format;
-	bool compressed = false;
-
-	Image::Format real_format;
-	Ref<Image> img = _get_gl_image_and_format(p_data[0], p_data[0]->get_format(), real_format, format, internal_format, type, compressed, texture->resize_to_po2);
+	Ref<Image> img = _get_gl_image_and_format(p_data[0], p_data[0]->get_format(), texture->real_format, texture->gl_format_cache, texture->gl_internal_format_cache, texture->gl_type_cache, texture->compressed, texture->resize_to_po2);
 	ERR_FAIL_COND(img.is_null());
 
-	ERR_FAIL_COND_MSG(compressed, "Compressed 3D textures are not supported in the Compatibility renderer.");
+	ERR_FAIL_COND_MSG(texture->compressed, "Compressed 3D textures are not supported in the Compatibility renderer.");
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(texture->target, texture->tex_id);
-	_texture_set_swizzle(texture, texture->real_format);
+	_texture_set_swizzle(texture);
 
 	// Set filtering and repeat state to default.
 	if (texture->mipmaps > 1) {
@@ -2153,10 +2069,10 @@ void TextureStorage::_texture_set_3d_data(RID p_texture, const Vector<Ref<Image>
 		all_data_size += image->get_data().size();
 
 		if (layer == 0 && p_initialize) {
-			glTexImage3D(GL_TEXTURE_3D, mipmap_level, internal_format, img_size.width, img_size.height, depth, 0, format, type, nullptr);
+			glTexImage3D(GL_TEXTURE_3D, mipmap_level, texture->gl_internal_format_cache, img_size.width, img_size.height, depth, 0, texture->gl_format_cache, texture->gl_type_cache, nullptr);
 		}
 
-		glTexSubImage3D(GL_TEXTURE_3D, mipmap_level, 0, 0, layer, img_size.width, img_size.height, 1, format, type, image->get_data().ptr());
+		glTexSubImage3D(GL_TEXTURE_3D, mipmap_level, 0, 0, layer, img_size.width, img_size.height, 1, texture->gl_format_cache, texture->gl_type_cache, image->get_data().ptr());
 
 		layer++;
 	}
@@ -2171,9 +2087,9 @@ void TextureStorage::_texture_set_3d_data(RID p_texture, const Vector<Ref<Image>
 #endif
 }
 
-void TextureStorage::_texture_set_swizzle(GLES3::Texture *p_texture, Image::Format p_real_format) {
+void TextureStorage::_texture_set_swizzle(GLES3::Texture *p_texture) {
 #ifndef WEB_ENABLED
-	switch (p_texture->format) {
+	switch (p_texture->real_format) {
 		case Image::FORMAT_L8: {
 			if (RasterizerUtilGLES3::is_gles_over_gl()) {
 				glTexParameteri(p_texture->target, GL_TEXTURE_SWIZZLE_R, GL_RED);
@@ -2203,13 +2119,7 @@ void TextureStorage::_texture_set_swizzle(GLES3::Texture *p_texture, Image::Form
 		case Image::FORMAT_ETC2_RA_AS_RG:
 		case Image::FORMAT_DXT5_RA_AS_RG: {
 			glTexParameteri(p_texture->target, GL_TEXTURE_SWIZZLE_R, GL_RED);
-			if (p_texture->format == p_real_format) {
-				// Swizzle RA from compressed texture into RG.
-				glTexParameteri(p_texture->target, GL_TEXTURE_SWIZZLE_G, GL_ALPHA);
-			} else {
-				// Converted textures are already in RG, leave as-is.
-				glTexParameteri(p_texture->target, GL_TEXTURE_SWIZZLE_G, GL_GREEN);
-			}
+			glTexParameteri(p_texture->target, GL_TEXTURE_SWIZZLE_G, GL_ALPHA);
 			glTexParameteri(p_texture->target, GL_TEXTURE_SWIZZLE_B, GL_ZERO);
 			glTexParameteri(p_texture->target, GL_TEXTURE_SWIZZLE_A, GL_ONE);
 		} break;

@@ -480,7 +480,7 @@ private:
 
 	void _texture_set_data(RID p_texture, const Ref<Image> &p_image, int p_layer, bool p_initialize);
 	void _texture_set_3d_data(RID p_texture, const Vector<Ref<Image>> &p_data, bool p_initialize);
-	void _texture_set_swizzle(Texture *p_texture, Image::Format p_real_format);
+	void _texture_set_swizzle(Texture *p_texture);
 	Vector<Ref<Image>> _texture_3d_read_framebuffer(Texture *p_texture) const;
 
 	struct RenderTargetSDF {
