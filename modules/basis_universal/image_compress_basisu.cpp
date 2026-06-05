@@ -112,17 +112,21 @@ Vector<uint8_t> basis_universal_packer(const Ref<Image> &p_image, Image::UsedCha
 
 	basisu::basis_compressor_params params;
 
-	params.m_uastc = true;
-	params.m_pack_uastc_ldr_4x4_flags &= ~basisu::cPackUASTCLevelMask;
-	params.m_pack_uastc_ldr_4x4_flags |= p_basisu_params.uastc_level;
-
-	params.m_rdo_uastc_ldr_4x4 = p_basisu_params.rdo_quality_loss >= 0.01;
-	params.m_rdo_uastc_ldr_4x4_quality_scalar = p_basisu_params.rdo_quality_loss;
-	params.m_rdo_uastc_ldr_4x4_dict_size = rdo_dict_size;
-
 	params.m_create_ktx2_file = true;
-	params.m_ktx2_uastc_supercompression = zstd_supercompression ? basist::KTX2_SS_ZSTANDARD : basist::KTX2_SS_NONE;
-	params.m_ktx2_zstd_supercompression_level = zstd_supercompression_level;
+	if (p_basisu_params.high_quality) {
+		params.m_uastc = true;
+		params.m_pack_uastc_ldr_4x4_flags &= ~basisu::cPackUASTCLevelMask;
+		params.m_pack_uastc_ldr_4x4_flags |= p_basisu_params.uastc_level;
+
+		params.m_rdo_uastc_ldr_4x4 = p_basisu_params.rdo_quality_loss >= 0.01;
+		params.m_rdo_uastc_ldr_4x4_quality_scalar = p_basisu_params.rdo_quality_loss;
+		params.m_rdo_uastc_ldr_4x4_dict_size = rdo_dict_size;
+
+		params.m_ktx2_uastc_supercompression = zstd_supercompression ? basist::KTX2_SS_ZSTANDARD : basist::KTX2_SS_NONE;
+		params.m_ktx2_zstd_supercompression_level = zstd_supercompression_level;
+	} else {
+		params.m_etc1s_quality_level = Math::round((10.0f - p_basisu_params.rdo_quality_loss) * 25.5f);
+	}
 
 	params.m_mip_fast = true;
 	params.m_multithreading = true;
@@ -262,8 +266,13 @@ Vector<uint8_t> basis_universal_packer(const Ref<Image> &p_image, Image::UsedCha
 	basisu_data.resize(basisu_encoded.size() + 4);
 	uint8_t *basisu_data_ptr = basisu_data.ptrw();
 
+	uint32_t decompress_flags = decompress_format | BASIS_DECOMPRESS_FLAG_KTX2;
+	if (!p_basisu_params.high_quality) {
+		decompress_flags |= BASIS_DECOMPRESS_FLAG_LOW_QUALITY;
+	}
+
 	// Copy the encoded BasisU data into the output buffer.
-	*(uint32_t *)basisu_data_ptr = decompress_format | BASIS_DECOMPRESS_FLAG_KTX2;
+	*(uint32_t *)basisu_data_ptr = decompress_flags;
 	memcpy(basisu_data_ptr + 4, basisu_encoded.get_ptr(), basisu_encoded.size());
 
 	print_verbose(vformat("BasisU: Encoding a %dx%d image with %d mipmaps took %d ms.", p_image->get_width(), p_image->get_height(), p_image->get_mipmap_count(), OS::get_singleton()->get_ticks_msec() - start_time));
@@ -299,6 +308,9 @@ Ref<Image> basis_universal_unpacker_ptr(const uint8_t *p_data, int p_size) {
 	bool is_ktx2 = decompress_format & BASIS_DECOMPRESS_FLAG_KTX2;
 	decompress_format &= ~BASIS_DECOMPRESS_FLAG_KTX2;
 
+	bool is_low_quality = decompress_format & BASIS_DECOMPRESS_FLAG_LOW_QUALITY;
+	decompress_format &= ~BASIS_DECOMPRESS_FLAG_LOW_QUALITY;
+
 	switch (decompress_format) {
 		case BASIS_DECOMPRESS_R: {
 			if (etc2_supported) {
@@ -333,19 +345,25 @@ Ref<Image> basis_universal_unpacker_ptr(const uint8_t *p_data, int p_size) {
 
 		} break;
 		case BASIS_DECOMPRESS_RGB: {
-			if (astc_supported) {
-				basisu_format = basist::transcoder_texture_format::cTFASTC_4x4_RGBA;
-				image_format = Image::FORMAT_ASTC_4x4;
-			} else if (bptc_supported) {
-				basisu_format = basist::transcoder_texture_format::cTFBC7_M6_OPAQUE_ONLY;
-				image_format = Image::FORMAT_BPTC_RGBA;
-			} else if (etc2_supported) {
-				basisu_format = basist::transcoder_texture_format::cTFETC1;
-				image_format = Image::FORMAT_ETC2_RGB8;
-			} else if (s3tc_supported) {
-				basisu_format = basist::transcoder_texture_format::cTFBC1;
-				image_format = Image::FORMAT_DXT1;
+			if (!is_low_quality) {
+				if (astc_supported) {
+					basisu_format = basist::transcoder_texture_format::cTFASTC_4x4_RGBA;
+					image_format = Image::FORMAT_ASTC_4x4;
+				} else if (bptc_supported) {
+					basisu_format = basist::transcoder_texture_format::cTFBC7_M6_OPAQUE_ONLY;
+					image_format = Image::FORMAT_BPTC_RGBA;
+				}
 			} else {
+				if (etc2_supported) {
+					basisu_format = basist::transcoder_texture_format::cTFETC1;
+					image_format = Image::FORMAT_ETC2_RGB8;
+				} else if (s3tc_supported) {
+					basisu_format = basist::transcoder_texture_format::cTFBC1;
+					image_format = Image::FORMAT_DXT1;
+				}
+			}
+
+			if (image_format == Image::FORMAT_MAX) {
 				// No supported VRAM compression formats, decompress.
 				basisu_format = basist::transcoder_texture_format::cTFRGBA32;
 				image_format = Image::FORMAT_RGBA8;
@@ -353,19 +371,25 @@ Ref<Image> basis_universal_unpacker_ptr(const uint8_t *p_data, int p_size) {
 
 		} break;
 		case BASIS_DECOMPRESS_RGBA: {
-			if (astc_supported) {
-				basisu_format = basist::transcoder_texture_format::cTFASTC_4x4_RGBA;
-				image_format = Image::FORMAT_ASTC_4x4;
-			} else if (bptc_supported) {
-				basisu_format = basist::transcoder_texture_format::cTFBC7_M5;
-				image_format = Image::FORMAT_BPTC_RGBA;
-			} else if (etc2_supported) {
-				basisu_format = basist::transcoder_texture_format::cTFETC2;
-				image_format = Image::FORMAT_ETC2_RGBA8;
-			} else if (s3tc_supported) {
-				basisu_format = basist::transcoder_texture_format::cTFBC3;
-				image_format = Image::FORMAT_DXT5;
+			if (!is_low_quality) {
+				if (astc_supported) {
+					basisu_format = basist::transcoder_texture_format::cTFASTC_4x4_RGBA;
+					image_format = Image::FORMAT_ASTC_4x4;
+				} else if (bptc_supported) {
+					basisu_format = basist::transcoder_texture_format::cTFBC7_M5;
+					image_format = Image::FORMAT_BPTC_RGBA;
+				}
 			} else {
+				if (etc2_supported) {
+					basisu_format = basist::transcoder_texture_format::cTFETC2;
+					image_format = Image::FORMAT_ETC2_RGBA8;
+				} else if (s3tc_supported) {
+					basisu_format = basist::transcoder_texture_format::cTFBC3;
+					image_format = Image::FORMAT_DXT5;
+				}
+			}
+
+			if (image_format == Image::FORMAT_MAX) {
 				// No supported VRAM compression formats, decompress.
 				basisu_format = basist::transcoder_texture_format::cTFRGBA32;
 				image_format = Image::FORMAT_RGBA8;

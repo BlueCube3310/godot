@@ -122,11 +122,17 @@ bool ResourceImporterLayeredTexture::get_option_visibility(const String &p_path,
 	if (p_option == "compress/lossy_quality" && p_options.has("compress/mode")) {
 		return int(p_options["compress/mode"]) == COMPRESS_LOSSY;
 	}
-	if ((p_option == "compress/high_quality" || p_option == "compress/hdr_compression") && p_options.has("compress/mode")) {
+	if ((p_option == "compress/hdr_compression") && p_options.has("compress/mode")) {
 		return int(p_options["compress/mode"]) == COMPRESS_VRAM_COMPRESSED;
 	}
-	if (p_option == "compress/uastc_level" || p_option == "compress/rdo_quality_loss") {
+	if (p_option == "compress/high_quality" && p_options.has("compress/mode")) {
+		return int(p_options["compress/mode"]) == COMPRESS_VRAM_COMPRESSED || int(p_options["compress/mode"]) == COMPRESS_BASIS_UNIVERSAL;
+	}
+	if (p_option == "compress/rdo_quality_loss") {
 		return int(p_options["compress/mode"]) == COMPRESS_BASIS_UNIVERSAL;
+	}
+	if (p_option == "compress/uastc_level") {
+		return int(p_options["compress/mode"]) == COMPRESS_BASIS_UNIVERSAL && bool(p_options["compress/high_quality"]);
 	}
 
 	return true;
@@ -142,7 +148,7 @@ String ResourceImporterLayeredTexture::get_preset_name(int p_idx) const {
 
 void ResourceImporterLayeredTexture::get_import_options(const String &p_path, List<ImportOption> *r_options, int p_preset) const {
 	r_options->push_back(ImportOption(PropertyInfo(Variant::INT, "compress/mode", PROPERTY_HINT_ENUM, "Lossless,Lossy,VRAM Compressed,VRAM Uncompressed,Basis Universal", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED), 1));
-	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "compress/high_quality"), false));
+	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "compress/high_quality", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED), false));
 	r_options->push_back(ImportOption(PropertyInfo(Variant::FLOAT, "compress/lossy_quality", PROPERTY_HINT_RANGE, "0,1,0.01"), 0.7));
 
 	Image::BasisUniversalPackerParams basisu_params;
@@ -388,6 +394,7 @@ Error ResourceImporterLayeredTexture::import(ResourceUID::ID p_source_id, const 
 	const Image::BasisUniversalPackerParams basisu_params = {
 		p_options["compress/uastc_level"],
 		p_options["compress/rdo_quality_loss"],
+		high_quality,
 	};
 
 	Array formats_imported;

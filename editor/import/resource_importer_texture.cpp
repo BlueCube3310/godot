@@ -180,7 +180,13 @@ String ResourceImporterTexture::get_resource_type() const {
 }
 
 bool ResourceImporterTexture::get_option_visibility(const String &p_path, const String &p_option, const HashMap<StringName, Variant> &p_options) const {
-	if (p_option == "compress/high_quality" || p_option == "compress/hdr_compression") {
+	if (p_option == "compress/high_quality") {
+		int compress_mode = int(p_options["compress/mode"]);
+		if (compress_mode != COMPRESS_VRAM_COMPRESSED && compress_mode != COMPRESS_BASIS_UNIVERSAL) {
+			return false;
+		}
+
+	} else if (p_option == "compress/hdr_compression") {
 		int compress_mode = int(p_options["compress/mode"]);
 		if (compress_mode != COMPRESS_VRAM_COMPRESSED) {
 			return false;
@@ -207,8 +213,10 @@ bool ResourceImporterTexture::get_option_visibility(const String &p_path, const 
 	} else if (p_option == "mipmaps/limit") {
 		return p_options["mipmaps/generate"];
 
-	} else if (p_option == "compress/uastc_level" || p_option == "compress/rdo_quality_loss") {
+	} else if (p_option == "compress/rdo_quality_loss") {
 		return int(p_options["compress/mode"]) == COMPRESS_BASIS_UNIVERSAL;
+	} else if (p_option == "compress/uastc_level") {
+		return int(p_options["compress/mode"]) == COMPRESS_BASIS_UNIVERSAL && bool(p_options["compress/high_quality"]);
 	}
 
 	return true;
@@ -230,7 +238,7 @@ String ResourceImporterTexture::get_preset_name(int p_idx) const {
 
 void ResourceImporterTexture::get_import_options(const String &p_path, List<ImportOption> *r_options, int p_preset) const {
 	r_options->push_back(ImportOption(PropertyInfo(Variant::INT, "compress/mode", PROPERTY_HINT_ENUM, "Lossless,Lossy,VRAM Compressed,VRAM Uncompressed,Basis Universal", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED), p_preset == PRESET_3D ? 2 : 0));
-	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "compress/high_quality"), false));
+	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "compress/high_quality", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED), false));
 	r_options->push_back(ImportOption(PropertyInfo(Variant::FLOAT, "compress/lossy_quality", PROPERTY_HINT_RANGE, "0,1,0.01"), 0.7));
 
 	Image::BasisUniversalPackerParams basisu_params;
@@ -706,7 +714,7 @@ Error ResourceImporterTexture::import(ResourceUID::ID p_source_id, const String 
 	const int pack_channels = p_options["compress/channel_pack"];
 	const int normal = p_options["compress/normal_map"];
 	const int hdr_compression = p_options["compress/hdr_compression"];
-	const int high_quality = p_options["compress/high_quality"];
+	const bool high_quality = p_options["compress/high_quality"];
 
 	// Mipmaps.
 	const bool mipmaps = p_options["mipmaps/generate"];
@@ -732,6 +740,7 @@ Error ResourceImporterTexture::import(ResourceUID::ID p_source_id, const String 
 	const Image::BasisUniversalPackerParams basisu_params = {
 		p_options["compress/uastc_level"],
 		p_options["compress/rdo_quality_loss"],
+		high_quality,
 	};
 
 	bool using_fallback_size_limit = false;

@@ -199,6 +199,7 @@ public:
 	struct BasisUniversalPackerParams {
 		int uastc_level = 0;
 		float rdo_quality_loss = 0;
+		bool high_quality = false;
 	};
 
 	// External saver function pointers.
