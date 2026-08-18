@@ -487,7 +487,7 @@ Error BetsyCompressor::_compress(BetsyFormat p_format, Image *r_img) {
 
 	// For the destination format just copy the source format and change the usage bits.
 	RD::TextureFormat dst_texture_format = src_texture_format;
-	dst_texture_format.usage_bits = RD::TEXTURE_USAGE_COLOR_ATTACHMENT_BIT | RD::TEXTURE_USAGE_STORAGE_BIT | RD::TEXTURE_USAGE_CAN_COPY_FROM_BIT | RD::TEXTURE_USAGE_CAN_COPY_TO_BIT | RD::TEXTURE_USAGE_CAN_UPDATE_BIT;
+	dst_texture_format.usage_bits = RD::TEXTURE_USAGE_STORAGE_BIT | RD::TEXTURE_USAGE_CAN_UPDATE_BIT | RD::TEXTURE_USAGE_CAN_COPY_FROM_BIT;
 	dst_texture_format.format = dst_rd_format;
 
 	RD::TextureFormat dst_texture_format_alpha;
@@ -532,19 +532,18 @@ Error BetsyCompressor::_compress(BetsyFormat p_format, Image *r_img) {
 	// Compress each mipmap.
 	for (int i = 0; i < mip_count; i++) {
 		int width, height;
-		Image::get_image_mipmap_offset_and_dimensions(img_width, img_height, dest_format, i, width, height);
-
 		int64_t src_mip_ofs, src_mip_size;
-		int src_mip_w, src_mip_h;
-		r_img->get_mipmap_offset_size_and_dimensions(i, src_mip_ofs, src_mip_size, src_mip_w, src_mip_h);
+		r_img->get_mipmap_offset_size_and_dimensions(i, src_mip_ofs, src_mip_size, width, height);
 
-		// Set the source texture width and size.
+		// The destination image's resolution is the number of compressed blocks on each axis.
+		int dst_width = (width + 3) >> 2;
+		int dst_height = (height + 3) >> 2;
+
 		src_texture_format.height = height;
 		src_texture_format.width = width;
 
-		// Set the destination texture width and size.
-		dst_texture_format.height = (height + 3) >> 2;
-		dst_texture_format.width = (width + 3) >> 2;
+		dst_texture_format.height = dst_height;
+		dst_texture_format.width = dst_width;
 
 		// Create a buffer filled with the source mip layer data.
 		src_image_ptr[0].resize(src_mip_size);
@@ -580,10 +579,10 @@ Error BetsyCompressor::_compress(BetsyFormat p_format, Image *r_img) {
 			RID source_buffer = compress_rd->storage_buffer_create(src_image_ptr[0].size(), src_image_ptr[0].span());
 
 			RD::TextureFormat rgba_texture_format = src_texture_format;
-			rgba_texture_format.usage_bits |= RD::TEXTURE_USAGE_COLOR_ATTACHMENT_BIT | RD::TEXTURE_USAGE_STORAGE_BIT | RD::TEXTURE_USAGE_CAN_COPY_FROM_BIT | RD::TEXTURE_USAGE_CAN_COPY_TO_BIT | RD::TEXTURE_USAGE_CAN_UPDATE_BIT;
+			rgba_texture_format.usage_bits |= RD::TEXTURE_USAGE_STORAGE_BIT;
 			src_texture = compress_rd->texture_create(rgba_texture_format, RD::TextureView());
 
-			Vector<RD::Uniform> uniforms;
+			LocalVector<RD::Uniform> uniforms;
 			{
 				{
 					RD::Uniform u;
@@ -625,7 +624,7 @@ Error BetsyCompressor::_compress(BetsyFormat p_format, Image *r_img) {
 		}
 
 		{
-			Vector<RD::Uniform> uniforms;
+			LocalVector<RD::Uniform> uniforms;
 			{
 				{
 					RD::Uniform u;
@@ -700,14 +699,13 @@ Error BetsyCompressor::_compress(BetsyFormat p_format, Image *r_img) {
 		RID dst_texture_rid = dst_texture_primary;
 
 		if (needs_alpha_block) {
-			// Set the destination texture width and size.
-			dst_texture_format_alpha.height = (height + 3) >> 2;
-			dst_texture_format_alpha.width = (width + 3) >> 2;
+			dst_texture_format_alpha.height = dst_height;
+			dst_texture_format_alpha.width = dst_width;
 
 			RID dst_texture_alpha = compress_rd->texture_create(dst_texture_format_alpha, RD::TextureView());
 
 			{
-				Vector<RD::Uniform> uniforms;
+				LocalVector<RD::Uniform> uniforms;
 				{
 					{
 						RD::Uniform u;
@@ -743,14 +741,13 @@ Error BetsyCompressor::_compress(BetsyFormat p_format, Image *r_img) {
 
 			// Stitching
 
-			// Set the destination texture width and size.
-			dst_texture_format_combined.height = (height + 3) >> 2;
-			dst_texture_format_combined.width = (width + 3) >> 2;
+			dst_texture_format_combined.height = dst_height;
+			dst_texture_format_combined.width = dst_width;
 
 			RID dst_texture_combined = compress_rd->texture_create(dst_texture_format_combined, RD::TextureView());
 
 			{
-				Vector<RD::Uniform> uniforms;
+				LocalVector<RD::Uniform> uniforms;
 				{
 					{
 						RD::Uniform u;
